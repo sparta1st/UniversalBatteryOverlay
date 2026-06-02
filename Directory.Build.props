@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <Company>Universal Battery Overlay contributors</Company>
+    <Authors>Universal Battery Overlay contributors</Authors>
+    <Product>Universal Battery Overlay</Product>
+    <Description>Realtime Windows tray battery overlay for wireless devices.</Description>
+    <Copyright>Copyright © 2026 Universal Battery Overlay contributors</Copyright>
+    <Version>0.20.0</Version>
+    <AssemblyVersion>0.20.0.0</AssemblyVersion>
+    <FileVersion>0.20.0.0</FileVersion>
+  </PropertyGroup>
+</Project>

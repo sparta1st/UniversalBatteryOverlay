@@ -1,0 +1,32 @@
+# Build outputs
+bin/
+obj/
+out/
+publish/
+artifacts/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs and debug output
+*.log
+*.tmp
+device-debug.txt
+headsetcontrol-debug.txt
+
+# Local tools downloaded by helper scripts
+tools/headsetcontrol/*
+!tools/headsetcontrol/.gitkeep
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# NuGet
+*.nupkg
+packages/
