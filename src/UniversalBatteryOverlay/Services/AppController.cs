@@ -19,13 +19,16 @@ public sealed class AppController : IDisposable
     private FormsNotifyIcon? _tray;
     private readonly HashSet<string> _alreadyNotified = new(StringComparer.OrdinalIgnoreCase);
     private bool _trayTipShown;
+    private bool _disposed;
 
     public static AppController? Instance { get; private set; }
     public bool OverlayVisible => _overlay.IsVisible;
+    public bool TrayAvailable => _tray is not null;
 
     public AppController()
     {
         Instance = this;
+        StartupLogger.Info("Creating services/windows.");
         _settingsService = new SettingsService();
         _settings = _settingsService.Load();
         _monitor = new BatteryMonitorService(_settings);
@@ -36,11 +39,46 @@ public sealed class AppController : IDisposable
 
     public void Start()
     {
-        CreateTrayIcon();
-        _overlay.ApplySettings(_settings);
-        _overlay.Show();
-        _monitor.Start();
+        StartupLogger.Info("Starting controller.");
+
+        // The settings window is shown first. If tray creation fails for any reason,
+        // the app still remains visible instead of disappearing silently.
         _mainWindow.Show();
+        StartupLogger.Info("Settings window shown.");
+
+        try
+        {
+            CreateTrayIcon();
+            StartupLogger.Info("Tray icon created.");
+        }
+        catch (Exception ex)
+        {
+            StartupLogger.Error("Tray icon could not be created", ex);
+            _mainWindow.ShowTrayWarning(StartupLogger.StartupLogPath);
+        }
+
+        try
+        {
+            _overlay.ApplySettings(_settings);
+            _overlay.Show();
+            StartupLogger.Info("Overlay shown.");
+        }
+        catch (Exception ex)
+        {
+            StartupLogger.Error("Overlay could not be shown", ex);
+            _mainWindow.ShowOverlayWarning(StartupLogger.StartupLogPath);
+        }
+
+        try
+        {
+            _monitor.Start();
+            StartupLogger.Info("Monitor started.");
+        }
+        catch (Exception ex)
+        {
+            StartupLogger.Error("Battery monitor could not be started", ex);
+            _mainWindow.ShowMonitorWarning(StartupLogger.StartupLogPath);
+        }
     }
 
     public void ToggleOverlay()
@@ -55,24 +93,47 @@ public sealed class AppController : IDisposable
 
     public void ApplyOverlaySettings()
     {
-        _overlay.ApplySettings(_settings);
+        try
+        {
+            _overlay.ApplySettings(_settings);
+        }
+        catch (Exception ex)
+        {
+            StartupLogger.Error("Apply overlay settings failed", ex);
+        }
     }
 
     public void ShowSettings()
     {
-        if (!_mainWindow.IsVisible) _mainWindow.Show();
-        _mainWindow.WindowState = WindowState.Normal;
-        _mainWindow.ShowInTaskbar = true;
-        _mainWindow.Activate();
+        try
+        {
+            if (!_mainWindow.IsVisible) _mainWindow.Show();
+            _mainWindow.WindowState = WindowState.Normal;
+            _mainWindow.ShowInTaskbar = true;
+            _mainWindow.Activate();
+        }
+        catch (Exception ex)
+        {
+            StartupLogger.Error("Show settings failed", ex);
+        }
     }
 
     public void HideSettingsToTray()
     {
+        if (_tray is null)
+        {
+            // Never hide the only usable window if the tray is unavailable.
+            _mainWindow.WindowState = WindowState.Minimized;
+            _mainWindow.ShowInTaskbar = true;
+            StartupLogger.Info("Tray unavailable; minimized settings window instead of hiding it.");
+            return;
+        }
+
         _mainWindow.Hide();
         if (!_trayTipShown)
         {
             _trayTipShown = true;
-            _tray?.ShowBalloonTip(
+            SafeTrayTip(
                 2500,
                 "Universal Battery Overlay",
                 "Still running in the tray. Double-click the icon to reopen settings.",
@@ -88,7 +149,9 @@ public sealed class AppController : IDisposable
 
     private void Monitor_DevicesUpdated(object? sender, IReadOnlyList<DeviceBatteryInfo> devices)
     {
-        _overlay.UpdateDevices(devices);
+        try { _overlay.UpdateDevices(devices); }
+        catch (Exception ex) { StartupLogger.Error("Overlay update failed", ex); }
+
         UpdateTrayText(devices);
 
         foreach (var device in devices)
@@ -98,9 +161,7 @@ public sealed class AppController : IDisposable
             if (device.BatteryPercent.Value <= _settings.LowBatteryThreshold)
             {
                 if (_alreadyNotified.Add(key))
-                {
-                    _tray?.ShowBalloonTip(5000, "Battery low", $"{device.TypeDisplay}: {device.BatteryPercent}%", FormsToolTipIcon.Warning);
-                }
+                    SafeTrayTip(5000, "Battery low", $"{device.TypeDisplay}: {device.BatteryPercent}%", FormsToolTipIcon.Warning);
             }
             else if (device.BatteryPercent.Value > _settings.LowBatteryThreshold + 5)
             {
@@ -116,7 +177,10 @@ public sealed class AppController : IDisposable
             var iconPath = Path.Combine(AppContext.BaseDirectory, "app.ico");
             if (File.Exists(iconPath)) return new System.Drawing.Icon(iconPath);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            StartupLogger.Error("Could not load tray icon", ex);
+        }
 
         return System.Drawing.SystemIcons.Information;
     }
@@ -126,7 +190,7 @@ public sealed class AppController : IDisposable
         _tray = new FormsNotifyIcon
         {
             Icon = LoadTrayIcon(),
-            Text = "Universal Battery Overlay - realtime",
+            Text = "Universal Battery Overlay",
             Visible = true
         };
 
@@ -134,11 +198,20 @@ public sealed class AppController : IDisposable
         menu.Items.Add("Open settings", null, (_, _) => ShowSettings());
         menu.Items.Add("Refresh now", null, async (_, _) => await _monitor.RefreshAsync());
         menu.Items.Add("Show / hide overlay", null, (_, _) => ToggleOverlay());
-        menu.Items.Add("Open custom readers folder", null, (_, _) =>
+        menu.Items.Add("Open logs folder", null, (_, _) =>
+        {
+            Directory.CreateDirectory(StartupLogger.LogFolder);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = StartupLogger.LogFolder,
+                UseShellExecute = true
+            });
+        });
+        menu.Items.Add("Report bug on GitHub", null, (_, _) =>
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                FileName = PathsService.ReadersFolder,
+                FileName = "https://github.com/sparta1st/UniversalBatteryOverlay/issues/new/choose",
                 UseShellExecute = true
             });
         });
@@ -147,6 +220,7 @@ public sealed class AppController : IDisposable
         _tray.ContextMenuStrip = menu;
         _tray.DoubleClick += (_, _) => ShowSettings();
         _tray.MouseClick += Tray_MouseClick;
+        _tray.Visible = true;
     }
 
     private void Tray_MouseClick(object? sender, FormsMouseEventArgs e)
@@ -166,24 +240,35 @@ public sealed class AppController : IDisposable
             .ToList();
 
         var text = lines.Count == 0
-            ? "Universal Battery Overlay - realtime"
+            ? "Universal Battery Overlay"
             : "Universal Battery Overlay - " + string.Join(" | ", lines);
 
-        _tray.Text = text.Length > 63 ? text[..63] : text;
+        try { _tray.Text = text.Length > 63 ? text[..63] : text; }
+        catch (Exception ex) { StartupLogger.Error("Update tray text failed", ex); }
+    }
+
+    private void SafeTrayTip(int timeout, string title, string text, FormsToolTipIcon icon)
+    {
+        try { _tray?.ShowBalloonTip(timeout, title, text, icon); }
+        catch (Exception ex) { StartupLogger.Error("Show tray balloon failed", ex); }
     }
 
     public void Dispose()
     {
-        _monitor.DevicesUpdated -= Monitor_DevicesUpdated;
-        _monitor.Dispose();
+        if (_disposed) return;
+        _disposed = true;
+        StartupLogger.Info("Disposing controller.");
+
+        try { _monitor.DevicesUpdated -= Monitor_DevicesUpdated; } catch { }
+        try { _monitor.Dispose(); } catch (Exception ex) { StartupLogger.Error("Monitor dispose failed", ex); }
         if (_tray is not null)
         {
-            _tray.Visible = false;
-            _tray.Dispose();
+            try { _tray.Visible = false; } catch { }
+            try { _tray.Dispose(); } catch (Exception ex) { StartupLogger.Error("Tray dispose failed", ex); }
             _tray = null;
         }
-        try { _overlay.Close(); } catch { }
-        try { _mainWindow.AllowClose(); _mainWindow.Close(); } catch { }
+        try { _overlay.Close(); } catch (Exception ex) { StartupLogger.Error("Overlay close failed", ex); }
+        try { _mainWindow.AllowClose(); _mainWindow.Close(); } catch (Exception ex) { StartupLogger.Error("Main window close failed", ex); }
         if (Instance == this) Instance = null;
     }
 }

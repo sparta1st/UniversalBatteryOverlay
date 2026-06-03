@@ -144,26 +144,119 @@ public sealed class LogitechG733DirectFrameReader : IBatteryReader
         charging = null;
         status = "not attempted";
 
-        using var handle = HidInterop.OpenReadWrite(path);
+        using var handle = HidInterop.OpenReadWriteOverlapped(path);
         if (handle.IsInvalid)
         {
-            status = "cannot open handle";
+            // Some Logitech drivers reject overlapped handles. Fall back to the classic handle.
+            using var fallbackHandle = HidInterop.OpenReadWrite(path);
+            if (fallbackHandle.IsInvalid)
+            {
+                status = "cannot open handle";
+                return false;
+            }
+
+            return TryReadBatteryClassic(fallbackHandle, out percent, out voltageMv, out charging, out status);
+        }
+
+        if (!HidInterop.TryGetCaps(handle, out var featureLen, out var inputLen, out var outputLen))
+        {
+            status = "caps unavailable";
             return false;
         }
+
+        var caps = $"caps F={featureLen} I={inputLen} O={outputLen}";
+        var maxReportLength = Math.Max((int)inputLen, Math.Max((int)outputLen, (int)featureLen));
+        var bufferSize = Math.Max(64, maxReportLength);
+
+        try
+        {
+            using var stream = new FileStream(handle, FileAccess.ReadWrite, bufferSize, isAsync: true);
+            var requests = BuildRequests(outputLen, featureLen).ToList();
+            foreach (var request in requests)
+            {
+                var sentMethod = HidInterop.TrySendReport(handle, request);
+                if (sentMethod is null)
+                {
+                    try
+                    {
+                        stream.Write(request, 0, request.Length);
+                        stream.Flush();
+                        sentMethod = $"FileStream.Write:{request.Length}";
+                    }
+                    catch (Exception ex)
+                    {
+                        status = $"send failed len={request.Length}: {ex.GetType().Name}: {ex.Message}, {caps}";
+                        continue;
+                    }
+                }
+
+                Thread.Sleep(70);
+
+                foreach (var responseLength in CandidateResponseLengths(inputLen, featureLen))
+                {
+                    if (HidInterop.TryReadInterruptReport(stream, responseLength, 350, out var interruptResponse, out var interruptStatus))
+                    {
+                        if (TryParseG733Battery(interruptResponse, out voltageMv, out charging, out percent))
+                        {
+                            var state = charging == true ? "charging" : charging == false ? "discharging" : "unknown";
+                            status = $"OK · {percent}% · {voltageMv}mV · {state} · sent={sentMethod} · read=ReadFile · {caps}";
+                            return true;
+                        }
+
+                        status = $"interrupt response without battery raw={BitConverter.ToString(interruptResponse.Take(Math.Min(20, interruptResponse.Length)).ToArray())}, {caps}";
+                    }
+                    else
+                    {
+                        status = $"interrupt read failed: {interruptStatus}, {caps}";
+                    }
+
+                    var response = new byte[responseLength];
+                    response[0] = 0x11;
+                    var ok = HidInterop.HidD_GetInputReport(handle, response, response.Length);
+                    if (!ok)
+                    {
+                        response[0] = 0x11;
+                        ok = HidInterop.HidD_GetFeature(handle, response, response.Length);
+                    }
+
+                    if (!ok)
+                        continue;
+
+                    if (TryParseG733Battery(response, out voltageMv, out charging, out percent))
+                    {
+                        var state = charging == true ? "charging" : charging == false ? "discharging" : "unknown";
+                        status = $"OK · {percent}% · {voltageMv}mV · {state} · sent={sentMethod} · read=HidD · {caps}";
+                        return true;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            status = $"stream read failed: {ex.GetType().Name}: {ex.Message}, {caps}";
+            return false;
+        }
+
+        return false;
+    }
+
+
+    private static bool TryReadBatteryClassic(SafeFileHandle handle, out int percent, out int voltageMv, out bool? charging, out string status)
+    {
+        percent = 0;
+        voltageMv = 0;
+        charging = null;
 
         var caps = HidInterop.TryGetCaps(handle, out var featureLen, out var inputLen, out var outputLen)
             ? $"caps F={featureLen} I={inputLen} O={outputLen}"
             : "caps unavailable";
 
-        var requests = BuildRequests(outputLen, featureLen).ToList();
-        foreach (var request in requests)
+        foreach (var request in BuildRequests(outputLen, featureLen))
         {
-            // G733 battery request is an output report. Try the three safe Windows paths:
-            // SetOutputReport, WriteFile, then Feature as fallback. This targets only VID_046D/PID_0AB5.
             var sentMethod = HidInterop.TrySendReport(handle, request);
             if (sentMethod is null)
             {
-                status = $"send failed len={request.Length}, err={Marshal.GetLastWin32Error()}, {caps}";
+                status = $"classic send failed len={request.Length}, err={Marshal.GetLastWin32Error()}, {caps}";
                 continue;
             }
 
@@ -173,7 +266,6 @@ public sealed class LogitechG733DirectFrameReader : IBatteryReader
             {
                 var response = new byte[responseLength];
                 response[0] = 0x11;
-
                 var ok = HidInterop.HidD_GetInputReport(handle, response, response.Length);
                 if (!ok)
                 {
@@ -183,31 +275,37 @@ public sealed class LogitechG733DirectFrameReader : IBatteryReader
 
                 if (!ok)
                 {
-                    status = $"read failed len={responseLength}, err={Marshal.GetLastWin32Error()}, {caps}";
+                    status = $"classic read failed len={responseLength}, err={Marshal.GetLastWin32Error()}, {caps}";
                     continue;
                 }
 
                 if (TryParseG733Battery(response, out voltageMv, out charging, out percent))
                 {
                     var state = charging == true ? "charging" : charging == false ? "discharging" : "unknown";
-                    status = $"OK · {percent}% · {voltageMv}mV · {state} · sent={sentMethod} · {caps}";
+                    status = $"OK · {percent}% · {voltageMv}mV · {state} · sent={sentMethod} · read=classic HidD · {caps}";
                     return true;
                 }
 
-                status = $"response without battery raw={BitConverter.ToString(response.Take(Math.Min(20, response.Length)).ToArray())}, {caps}";
+                status = $"classic response without battery raw={BitConverter.ToString(response.Take(Math.Min(20, response.Length)).ToArray())}, {caps}";
             }
         }
 
+        status = $"classic read did not return a battery frame, {caps}";
         return false;
     }
 
     private static IEnumerable<byte[]> BuildRequests(ushort outputLen, ushort featureLen)
     {
-        var base20 = new byte[20];
-        base20[0] = 0x11;
-        base20[1] = 0xff;
-        base20[2] = 0x08;
-        base20[3] = 0x0e;
+        var bases = new List<byte[]>();
+        foreach (var deviceIndex in new byte[] { 0xff, 0x00, 0x01, 0x02 })
+        {
+            var base20 = new byte[20];
+            base20[0] = 0x11;
+            base20[1] = deviceIndex;
+            base20[2] = 0x08;
+            base20[3] = 0x0e;
+            bases.Add(base20);
+        }
 
         var lengths = new List<int> { 20, 21 };
         if (outputLen >= 20 && outputLen <= 128) lengths.Insert(0, outputLen);
@@ -216,17 +314,20 @@ public sealed class LogitechG733DirectFrameReader : IBatteryReader
         foreach (var len in lengths.Distinct())
         {
             if (len < 20) continue;
-            var b = new byte[len];
-            Array.Copy(base20, 0, b, 0, base20.Length);
-            yield return b;
-
-            // Windows HID shifted variant: byte 0 report-id slot, then 20-byte frame.
-            if (len >= 21)
+            foreach (var base20 in bases)
             {
-                var shifted = new byte[len];
-                shifted[0] = 0x00;
-                Array.Copy(base20, 0, shifted, 1, base20.Length);
-                yield return shifted;
+                var b = new byte[len];
+                Array.Copy(base20, 0, b, 0, base20.Length);
+                yield return b;
+
+                // Windows HID shifted variant: byte 0 report-id slot, then 20-byte frame.
+                if (len >= 21)
+                {
+                    var shifted = new byte[len];
+                    shifted[0] = 0x00;
+                    Array.Copy(base20, 0, shifted, 1, base20.Length);
+                    yield return shifted;
+                }
             }
         }
     }
@@ -249,7 +350,7 @@ public sealed class LogitechG733DirectFrameReader : IBatteryReader
         {
             if (data.Length < offset + 7) continue;
             if (data[offset + 0] != 0x11) continue;
-            if (data[offset + 1] != 0xff) continue;
+            // Byte 1 is the device index. G733 often answers FF, but some stacks use 00/01/02.
             if (data[offset + 2] != 0x08) continue;
             if (data[offset + 3] != 0x0e) continue;
 
@@ -307,6 +408,7 @@ public sealed class LogitechG733DirectFrameReader : IBatteryReader
         private const uint FILE_SHARE_WRITE = 0x00000002;
         private const uint OPEN_EXISTING = 3;
         private const uint FILE_ATTRIBUTE_NORMAL = 0x00000080;
+        private const uint FILE_FLAG_OVERLAPPED = 0x40000000;
         private const uint DIGCF_PRESENT = 0x00000002;
         private const uint DIGCF_DEVICEINTERFACE = 0x00000010;
         private const int ERROR_NO_MORE_ITEMS = 259;
@@ -320,6 +422,46 @@ public sealed class LogitechG733DirectFrameReader : IBatteryReader
             OPEN_EXISTING,
             FILE_ATTRIBUTE_NORMAL,
             IntPtr.Zero);
+
+        public static SafeFileHandle OpenReadWriteOverlapped(string path) => CreateFile(
+            path,
+            GENERIC_READ | GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            IntPtr.Zero,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
+            IntPtr.Zero);
+
+        public static bool TryReadInterruptReport(FileStream stream, int length, int timeoutMs, out byte[] report, out string status)
+        {
+            report = new byte[length];
+            status = string.Empty;
+            try
+            {
+                using var cts = new CancellationTokenSource(timeoutMs);
+                var read = stream.ReadAsync(report.AsMemory(0, report.Length), cts.Token).AsTask().GetAwaiter().GetResult();
+                if (read <= 0)
+                {
+                    status = "ReadFile returned 0 bytes";
+                    return false;
+                }
+
+                if (read < report.Length)
+                    Array.Resize(ref report, read);
+
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                status = $"ReadFile timeout after {timeoutMs}ms";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                status = ex.GetType().Name + ": " + ex.Message;
+                return false;
+            }
+        }
 
         public static bool TryGetCaps(SafeFileHandle handle, out ushort featureLen, out ushort inputLen, out ushort outputLen)
         {

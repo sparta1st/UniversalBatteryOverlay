@@ -7,7 +7,7 @@ namespace UniversalBatteryOverlay.Readers;
 /// <summary>
 /// Razer Viper V2 Pro battery reader, Windows-safe edition.
 ///
-/// Why v16 is different:
+/// Why v11 is different:
 /// - It opens the HID handle with dwDesiredAccess = 0, like the small Windows Viper tray projects do.
 ///   This avoids the normal mouse/keyboard exclusive lock and avoids grabbing input control.
 /// - It filters by HID caps: UsagePage 0x01, Usage 0x02, FeatureReportByteLength >= 90/91.
@@ -50,7 +50,7 @@ public sealed class RazerViperV2ProHidReader : IBatteryReader
                         cancellationToken.ThrowIfCancellationRequested();
                         lastPath = c.Path;
 
-                        if (TryReadBattery(c, out var percent, out var raw, out var charging, out var status))
+                        if (TryReadBattery(c, out var percent, out var raw, out var status))
                         {
                             return new[]
                             {
@@ -59,7 +59,7 @@ public sealed class RazerViperV2ProHidReader : IBatteryReader
                                     Name = "Razer Viper V2 Pro",
                                     DeviceType = "Mouse",
                                     BatteryPercent = percent,
-                                    IsCharging = charging,
+                                    IsCharging = null,
                                     Status = status,
                                     Reader = Name,
                                     RawId = c.Path,
@@ -170,11 +170,10 @@ public sealed class RazerViperV2ProHidReader : IBatteryReader
         return score;
     }
 
-    private static bool TryReadBattery(Candidate c, out int percent, out int raw, out bool? charging, out string status)
+    private static bool TryReadBattery(Candidate c, out int percent, out int raw, out string status)
     {
         percent = 0;
         raw = 0;
-        charging = null;
         status = "not attempted";
 
         using var handle = HidInterop.OpenFeatureOnly(c.Path);
@@ -197,7 +196,7 @@ public sealed class RazerViperV2ProHidReader : IBatteryReader
             {
                 foreach (var mode in ReportBuildModeExtensions.PreferenceOrderFor(len))
                 {
-                    var request = BuildPowerReport(tranId, len, mode, 0x80);
+                    var request = BuildBatteryReport(tranId, len, mode);
                     if (request is null) continue;
 
                     // Clear last error before each HID call for better diagnostics.
@@ -220,57 +219,11 @@ public sealed class RazerViperV2ProHidReader : IBatteryReader
 
                     if (TryExtractBattery(response, out raw, out percent))
                     {
-                        charging = TryReadCharging(handle, tranId, len, mode, out var chargingStatus) ? chargingStatus : null;
-                        var chargeText = charging == true ? " · charging" : charging == false ? " · not charging" : "";
-                        status = $"OK · {percent}% · raw {raw}/255{chargeText} · tran=0x{tranId:X2} · len={len} · mode={mode} · {caps}";
+                        status = $"OK · {percent}% · raw {raw}/255 · tran=0x{tranId:X2} · len={len} · mode={mode} · {caps}";
                         return true;
                     }
 
                     status = $"response without battery tran=0x{tranId:X2}, len={len}, mode={mode}, raw={BitConverter.ToString(response.Take(Math.Min(24, response.Length)).ToArray())}, {caps}";
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private static bool TryReadCharging(SafeFileHandle handle, byte tranId, int len, ReportBuildMode mode, out bool? charging)
-    {
-        charging = null;
-        var request = BuildPowerReport(tranId, len, mode, 0x84);
-        if (request is null) return false;
-        if (!HidInterop.HidD_SetFeature(handle, request, request.Length)) return false;
-        Thread.Sleep(120);
-        var response = new byte[len];
-        response[0] = 0x00;
-        if (!HidInterop.HidD_GetFeature(handle, response, response.Length)) return false;
-        return TryExtractCharging(response, out charging);
-    }
-
-    private static bool TryExtractCharging(byte[] response, out bool? charging)
-    {
-        charging = null;
-
-        // Razer power command 0x84 reports charging around byte 11 in raw 90-byte payload.
-        // With Windows report-id slot, the same value often lands at byte 12.
-        foreach (var idx in new[] { 12, 11, 10, 13 })
-        {
-            if (idx < 0 || idx >= response.Length) continue;
-            var value = response[idx];
-            if (value == 0x01)
-            {
-                charging = true;
-                return true;
-            }
-            if (value == 0x00)
-            {
-                // Only accept 0 when the frame still looks like a Razer power response.
-                var looksPower = response.Take(Math.Min(16, response.Length)).Any(b => b == 0x07)
-                              || response.Take(Math.Min(16, response.Length)).Any(b => b == 0x84);
-                if (looksPower)
-                {
-                    charging = false;
-                    return true;
                 }
             }
         }
@@ -304,7 +257,7 @@ public sealed class RazerViperV2ProHidReader : IBatteryReader
         return false;
     }
 
-    private static byte[]? BuildPowerReport(byte transactionId, int length, ReportBuildMode mode, byte commandId)
+    private static byte[]? BuildBatteryReport(byte transactionId, int length, ReportBuildMode mode)
     {
         // PyUSB/OpenRazer 90-byte payload:
         // status, transaction, remaining_packets(2), protocol_type, data_size, command_class=0x07, command_id=0x80, 80 data bytes, crc, 0.
@@ -316,7 +269,7 @@ public sealed class RazerViperV2ProHidReader : IBatteryReader
         payload[4] = 0x00;
         payload[5] = 0x02;
         payload[6] = 0x07;
-        payload[7] = commandId;
+        payload[7] = 0x80;
 
         byte crc = 0;
         for (var i = 2; i < 88; i++) crc ^= payload[i];

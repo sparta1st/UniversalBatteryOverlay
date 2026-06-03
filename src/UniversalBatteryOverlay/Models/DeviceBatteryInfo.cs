@@ -29,9 +29,21 @@ public sealed class DeviceBatteryInfo
 
             if (IsCharging == true && BatteryPercent.HasValue && stable) return "Charging · stabilized percentage";
             if (IsCharging == true && BatteryPercent.HasValue) return "Charging · live percentage";
-            if (IsCharging == true) return "Charging · percentage unavailable";
+            if (IsCharging == true) return "Charging · waiting for percentage";
             if (BatteryPercent.HasValue) return "Live percentage";
-            return "Detected · battery not exposed";
+
+            var lower = ($"{Name} {DeviceType} {Status} {Reader}").ToLowerInvariant();
+            if (lower.Contains("g733") || lower.Contains("logitech"))
+            {
+                if (lower.Contains("direct") || lower.Contains("headsetcontrol") || lower.Contains("failed"))
+                    return "Detected · headset battery reader failed";
+                return "Detected · waiting for headset reader";
+            }
+
+            if (lower.Contains("qwertykey") || lower.Contains("keyboard"))
+                return "Detected safely · passive keyboard mode";
+
+            return "Detected · percentage unavailable";
         }
     }
 
@@ -54,6 +66,7 @@ public sealed class DeviceBatteryInfo
         "headphones" => "Headset",
         "laptop" => "Laptop",
         "battery" => "Battery",
+        "controller" => "Controller",
         _ => "Device"
     };
 
@@ -69,6 +82,7 @@ public sealed class DeviceBatteryInfo
         "headphones" => "🎧",
         "laptop" => "💻",
         "battery" => "🔋",
+        "controller" => "🎮",
         _ => "🔌"
     };
 }

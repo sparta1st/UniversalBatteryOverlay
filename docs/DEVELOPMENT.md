@@ -1,36 +1,17 @@
 # Development
 
-## Stack
-
-- C#
-- .NET 8
-- WPF
-- Windows Forms NotifyIcon for tray behavior
-- Windows HID / PnP APIs for device discovery
-
-## Build locally
+## Build
 
 ```bat
-CHECK_BUILD.bat
+run.bat
 ```
 
-or:
+## Publish
 
-```powershell
-dotnet build .\src\UniversalBatteryOverlay\UniversalBatteryOverlay.csproj -c Release
+```bat
+publish.bat
 ```
 
-## Add a C# reader
+## Safety rule
 
-1. Create a class in `src/UniversalBatteryOverlay/Readers`.
-2. Implement `IBatteryReader`.
-3. Register it in `BatteryMonitorService`.
-4. Return `DeviceBatteryInfo` objects.
-
-## Reader guidelines
-
-- Never block the UI thread.
-- Keep reads short and cancellable.
-- Use a device lock for active HID commands.
-- Return clear diagnostic status.
-- Do not show fake battery values.
+Do not add direct HID probing to the default build. Any future aggressive device reader should be separate, clearly labeled, and disabled by default.

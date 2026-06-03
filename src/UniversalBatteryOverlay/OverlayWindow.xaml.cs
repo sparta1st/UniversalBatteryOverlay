@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Media.Effects;
 using MediaColor = System.Windows.Media.Color;
 using MediaBrushes = System.Windows.Media.Brushes;
+using MediaColorConverter = System.Windows.Media.ColorConverter;
 using FormsScreen = System.Windows.Forms.Screen;
 using UniversalBatteryOverlay.Models;
 using UniversalBatteryOverlay.Utils;
@@ -60,9 +61,14 @@ public partial class OverlayWindow : Window
         RootBorder.Padding = new Thickness(settings.OverlayPadding);
         RootBorder.CornerRadius = new CornerRadius(settings.OverlayCornerRadius);
         RootBorder.BorderThickness = settings.ShowOverlayBackground ? new Thickness(1) : new Thickness(0);
+        RootBorder.BorderBrush = new SolidColorBrush(ParseColor(settings.OverlayBorderColor, MediaColor.FromRgb(51, 65, 85)));
         RootBorder.Background = settings.ShowOverlayBackground
-            ? new SolidColorBrush(MediaColor.FromArgb(ToByte(settings.OverlayBackgroundOpacity), 11, 16, 32))
+            ? new SolidColorBrush(WithAlpha(ParseColor(settings.OverlayBackgroundColor, MediaColor.FromRgb(11, 16, 32)), settings.OverlayBackgroundOpacity))
             : MediaBrushes.Transparent;
+        Resources["OverlayRowBrush"] = new SolidColorBrush(WithAlpha(ParseColor(settings.OverlayRowBackgroundColor, MediaColor.FromRgb(17, 26, 46)), Math.Min(0.95, settings.OverlayBackgroundOpacity + 0.12)));
+        Resources["OverlayBorderBrush"] = new SolidColorBrush(ParseColor(settings.OverlayBorderColor, MediaColor.FromRgb(51, 65, 85)));
+        Resources["OverlayTextBrush"] = new SolidColorBrush(ParseColor(settings.OverlayTextColor, MediaColor.FromRgb(248, 250, 252)));
+        Resources["OverlayValueBrush"] = new SolidColorBrush(ParseColor(settings.OverlayValueColor, MediaColor.FromRgb(233, 213, 255)));
         RootBorder.Effect = settings.ShowOverlayShadow ? _shadowEffect : null;
 
         Topmost = true;
@@ -78,19 +84,8 @@ public partial class OverlayWindow : Window
             .ThenBy(d => d.TypeDisplay)
             .ToList();
 
-        Items.ItemsSource = visibleDevices.Count == 0
-            ? new[]
-            {
-                new DeviceBatteryInfo
-                {
-                    Name = "Battery data unavailable",
-                    DeviceType = "Device",
-                    BatteryPercent = null,
-                    Status = "Waiting for a supported battery reader",
-                    Reader = "Overlay"
-                }
-            }
-            : visibleDevices;
+        Items.ItemsSource = visibleDevices;
+        RootBorder.Visibility = visibleDevices.Count == 0 ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
 
         Reposition();
     }
@@ -142,6 +137,27 @@ public partial class OverlayWindow : Window
     }
 
     private static byte ToByte(double value) => (byte)Math.Clamp((int)Math.Round(value * 255), 0, 255);
+
+    private static MediaColor WithAlpha(MediaColor color, double alpha)
+    {
+        color.A = ToByte(alpha);
+        return color;
+    }
+
+    private static MediaColor ParseColor(string? text, MediaColor fallback)
+    {
+        try
+        {
+            var value = text?.Trim();
+            if (string.IsNullOrWhiteSpace(value)) return fallback;
+            if (!value.StartsWith("#", StringComparison.Ordinal)) value = "#" + value;
+            return (MediaColor)MediaColorConverter.ConvertFromString(value)!;
+        }
+        catch
+        {
+            return fallback;
+        }
+    }
 
     private static int DeviceSortOrder(string deviceType) => deviceType.ToLowerInvariant() switch
     {

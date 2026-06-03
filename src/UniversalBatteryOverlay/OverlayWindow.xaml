@@ -9,39 +9,51 @@
         ShowInTaskbar="False"
         Topmost="True"
         SizeToContent="WidthAndHeight">
+    <Window.Resources>
+        <SolidColorBrush x:Key="OverlayRowBrush" Color="#111A2E" />
+        <SolidColorBrush x:Key="OverlayBorderBrush" Color="#334155" />
+        <SolidColorBrush x:Key="OverlayTextBrush" Color="#F8FAFC" />
+        <SolidColorBrush x:Key="OverlayValueBrush" Color="#E9D5FF" />
+    </Window.Resources>
     <Border x:Name="RootBorder"
             CornerRadius="13"
-            BorderBrush="#344054"
+            BorderBrush="#4C1D95"
             BorderThickness="1"
             Padding="5"
             SnapsToDevicePixels="True">
         <Border.Background>
-            <SolidColorBrush Color="#D80B1020" />
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#0B1020" Offset="0" />
+                <GradientStop Color="#121A2B" Offset="0.58" />
+                <GradientStop Color="#160D28" Offset="1" />
+            </LinearGradientBrush>
         </Border.Background>
         <Border.Effect>
-            <DropShadowEffect BlurRadius="18" ShadowDepth="0" Opacity="0.34" />
+            <DropShadowEffect BlurRadius="22" ShadowDepth="0" Opacity="0.36" Color="#000000" />
         </Border.Effect>
         <ItemsControl x:Name="Items">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <Border CornerRadius="9"
-                            Background="#161E293B"
+                    <Border CornerRadius="10"
+                            Background="{DynamicResource OverlayRowBrush}"
                             Padding="{Binding RowPadding, RelativeSource={RelativeSource AncestorType=Window}}"
                             Margin="{Binding RowMargin, RelativeSource={RelativeSource AncestorType=Window}}"
-                            MinWidth="{Binding RowMinWidth, RelativeSource={RelativeSource AncestorType=Window}}">
+                            MinWidth="{Binding RowMinWidth, RelativeSource={RelativeSource AncestorType=Window}}"
+                            BorderBrush="{DynamicResource OverlayBorderBrush}"
+                            BorderThickness="1">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="{Binding TypeDisplay}"
-                                       Foreground="#F8FAFC"
+                                       Foreground="{DynamicResource OverlayTextBrush}"
                                        FontWeight="SemiBold"
                                        VerticalAlignment="Center"
-                                       Margin="0,0,14,0" />
+                                       Margin="0,0,16,0" />
                             <TextBlock Grid.Column="1"
                                        Text="{Binding BatteryWithChargingDisplay}"
-                                       Foreground="#F8FAFC"
+                                       Foreground="{DynamicResource OverlayValueBrush}"
                                        FontWeight="Bold"
                                        VerticalAlignment="Center" />
                         </Grid>

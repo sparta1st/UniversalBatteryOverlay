@@ -19,6 +19,11 @@ public sealed class AppSettings : INotifyPropertyChanged
     private int _overlayRowSpacing = 1;
     private int _overlayMinWidth = 112;
     private int _overlayCornerRadius = 13;
+    private string _overlayBackgroundColor = "#0B1020";
+    private string _overlayRowBackgroundColor = "#111A2E";
+    private string _overlayBorderColor = "#334155";
+    private string _overlayTextColor = "#F8FAFC";
+    private string _overlayValueColor = "#E9D5FF";
     private bool _showOverlayBackground = true;
     private bool _showOverlayShadow = true;
     private bool _clickThrough = true;
@@ -26,7 +31,9 @@ public sealed class AppSettings : INotifyPropertyChanged
     private bool _showLaptopBattery = true;
     private bool _startWithWindows = false;
     private bool _enableRazerDirectBatteryReader = true;
-    private bool _enableUniversalHidBatteryReader = true;
+    private bool _enableLogitechG733DirectBatteryReader = true;
+    private bool _enableUniversalHidBatteryReader = false;
+    private bool _enableHeadsetControlCliReader = true;
     private int _lowBatteryThreshold = 20;
 
     public string MonitorDeviceName { get => _monitorDeviceName; set => Set(ref _monitorDeviceName, value); }
@@ -43,6 +50,11 @@ public sealed class AppSettings : INotifyPropertyChanged
     public int OverlayRowSpacing { get => _overlayRowSpacing; set => Set(ref _overlayRowSpacing, Math.Clamp(value, 0, 30)); }
     public int OverlayMinWidth { get => _overlayMinWidth; set => Set(ref _overlayMinWidth, Math.Clamp(value, 80, 500)); }
     public int OverlayCornerRadius { get => _overlayCornerRadius; set => Set(ref _overlayCornerRadius, Math.Clamp(value, 0, 40)); }
+    public string OverlayBackgroundColor { get => _overlayBackgroundColor; set => Set(ref _overlayBackgroundColor, NormalizeHex(value, "#0B1020")); }
+    public string OverlayRowBackgroundColor { get => _overlayRowBackgroundColor; set => Set(ref _overlayRowBackgroundColor, NormalizeHex(value, "#111A2E")); }
+    public string OverlayBorderColor { get => _overlayBorderColor; set => Set(ref _overlayBorderColor, NormalizeHex(value, "#334155")); }
+    public string OverlayTextColor { get => _overlayTextColor; set => Set(ref _overlayTextColor, NormalizeHex(value, "#F8FAFC")); }
+    public string OverlayValueColor { get => _overlayValueColor; set => Set(ref _overlayValueColor, NormalizeHex(value, "#E9D5FF")); }
     public bool ShowOverlayBackground { get => _showOverlayBackground; set => Set(ref _showOverlayBackground, value); }
     public bool ShowOverlayShadow { get => _showOverlayShadow; set => Set(ref _showOverlayShadow, value); }
     public bool ClickThrough { get => _clickThrough; set => Set(ref _clickThrough, value); }
@@ -50,50 +62,32 @@ public sealed class AppSettings : INotifyPropertyChanged
     public bool ShowLaptopBattery { get => _showLaptopBattery; set => Set(ref _showLaptopBattery, value); }
     public bool StartWithWindows { get => _startWithWindows; set => Set(ref _startWithWindows, value); }
     public bool EnableRazerDirectBatteryReader { get => _enableRazerDirectBatteryReader; set => Set(ref _enableRazerDirectBatteryReader, value); }
+    public bool EnableLogitechG733DirectBatteryReader { get => _enableLogitechG733DirectBatteryReader; set => Set(ref _enableLogitechG733DirectBatteryReader, value); }
     public bool EnableUniversalHidBatteryReader { get => _enableUniversalHidBatteryReader; set => Set(ref _enableUniversalHidBatteryReader, value); }
+    public bool EnableHeadsetControlCliReader { get => _enableHeadsetControlCliReader; set => Set(ref _enableHeadsetControlCliReader, value); }
     public int LowBatteryThreshold { get => _lowBatteryThreshold; set => Set(ref _lowBatteryThreshold, Math.Clamp(value, 1, 99)); }
 
     public List<string> KnownDeviceHints { get; set; } = new()
     {
-        // User devices
-        "Razer", "Viper", "Viper V2 Pro", "VID_1532&PID_00A6",
-        "Logitech", "Logi", "G733", "Lightspeed", "VID_046D&PID_0AB5",
+        // Keep this list strict. These are passive matching hints only; they do not send HID commands.
+        // Broad vendor-only IDs such as VID_0B05 are intentionally not included because they can
+        // make the app show unrelated USB devices like RGB controllers and hubs.
+        "Razer Viper V2 Pro", "Viper V2 Pro", "VID_1532&PID_00A6", "VID_1532&PID_00A5",
+        "Logitech G733", "G733", "Lightspeed", "VID_046D&PID_0AB5",
         "QwertyKey", "QWERTYKEY", "VID_36B0&PID_3002",
-
-        // Big gaming/peripheral brands
-        "Corsair", "SteelSeries", "HyperX", "Kingston", "HP", "OMEN",
-        "ASUS", "ROG", "TUF", "AURA", "Acer", "Predator", "Lenovo", "Legion",
-        "MSI", "Alienware", "Dell", "Cooler Master", "Glorious", "Finalmouse",
-        "Pulsar", "Lamzu", "Endgame Gear", "Zowie", "BenQ", "ROCCAT", "Turtle Beach",
-        "Keychron", "Akko", "Royal Kludge", "RK", "Epomaker", "Wooting", "Ducky",
-        "Anne Pro", "NuPhy", "Redragon", "Razer BlackWidow", "DeathAdder", "Basilisk",
-        "Naga", "Orochi", "Cobra", "Barracuda", "BlackShark", "Kraken",
-        "G Pro", "PRO X", "G502", "G703", "G903", "G305", "G915", "G915 TKL",
-        "G435", "G535", "G733", "G935", "G Pro X Wireless",
-
-        // Controllers / Bluetooth devices
-        "Xbox Wireless", "Xbox Controller", "DualSense", "DualShock", "Sony", "Nintendo",
-        "Switch Pro", "8BitDo", "Bluetooth", "BLE", "BTH",
-
-        // Common USB vendor IDs for discovery/hints
-        "VID_1532", // Razer
-        "VID_046D", // Logitech
-        "VID_1038", // SteelSeries
-        "VID_1B1C", // Corsair
-        "VID_0951", // HyperX/Kingston
-        "VID_0B05", // ASUS
-        "VID_0DB0", // MSI
-        "VID_2516", // Cooler Master
-        "VID_258A", // SINO WEALTH / many keyboards
-        "VID_3434", // Keychron/QMK-like devices
-        "VID_3297", // ZSA/QMK-like devices
-        "VID_054C", // Sony
-        "VID_045E", // Microsoft Xbox
-        "VID_057E", // Nintendo
-        "VID_2DC8"  // 8BitDo
+        "Xbox Wireless Controller", "DualSense", "DualShock", "8BitDo", "Switch Pro Controller"
     };
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    private static string NormalizeHex(string? value, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return fallback;
+        var text = value.Trim();
+        if (!text.StartsWith("#", StringComparison.Ordinal)) text = "#" + text;
+        if (text.Length is not (7 or 9)) return fallback;
+        return text.Skip(1).All(Uri.IsHexDigit) ? text.ToUpperInvariant() : fallback;
+    }
 
     private void Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
     {

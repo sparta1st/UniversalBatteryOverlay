@@ -1,0 +1,65 @@
+name: Bug report
+description: Report a crash, visual bug, wrong battery percentage, missing tray icon, or unsupported device.
+title: "Bug: "
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the bug clearly.
+      placeholder: The tray icon does not appear / G733 jumps from 55% to 100% / overlay is misplaced...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      placeholder: 0.34.1
+    validations:
+      required: true
+  - type: dropdown
+    id: device-type
+    attributes:
+      label: Device type
+      options:
+        - Mouse
+        - Keyboard
+        - Headset / headphones
+        - Laptop/system battery
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: device-model
+    attributes:
+      label: Device model
+      placeholder: Razer Viper V2 Pro, Logitech G733, QwertyKey keyboard...
+    validations:
+      required: false
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Connection type
+      options:
+        - 2.4 GHz dongle
+        - Bluetooth
+        - USB cable
+        - Unknown
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Paste the latest log from %APPDATA%\UniversalBatteryOverlay\logs\startup.log if available.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Drag and drop screenshots if the issue is visual.
+    validations:
+      required: false

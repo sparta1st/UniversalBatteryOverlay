@@ -1,13 +1,29 @@
-# Safety notes
+# Safety Notes
 
-Wireless keyboards and mice can expose multiple HID interfaces. Sending unknown output or feature reports to the wrong interface can interfere with input.
+Universal Battery Overlay is designed to avoid interfering with input devices.
 
-Universal Battery Overlay follows these rules:
+## What is disabled
 
-- Keyboard readers are passive by default.
-- Unknown HID commands are not sent to keyboards.
-- Direct HID commands are targeted to known devices and filtered by VID/PID and HID capabilities.
-- Generic HID reading can be disabled in Advanced settings.
-- Device-specific readers use locks to avoid overlapping reads.
+The app does not use generic HID probing. Generic probing can accidentally open keyboard or dongle interfaces and may interfere with input.
 
-If a device behaves strangely, disable universal HID reading and restart the app.
+## What is allowed
+
+The app uses:
+
+- passive Windows device inventory;
+- passive Windows battery properties;
+- targeted readers for exact device IDs only.
+
+Current targeted readers:
+
+- Razer Viper V2 Pro: `VID_1532&PID_00A6` / `VID_1532&PID_00A5`;
+- Logitech G733: `VID_046D&PID_0AB5`.
+
+The QwertyKey keyboard is passive-only. The app does not send commands to it.
+
+## If input ever feels wrong
+
+1. Exit the app from the tray menu.
+2. Unplug/replug the affected dongle.
+3. Disable targeted readers from the Devices tab if needed.
+4. Open a GitHub issue with logs from `%APPDATA%\UniversalBatteryOverlay\logs`.

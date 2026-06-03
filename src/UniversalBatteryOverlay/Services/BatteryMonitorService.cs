@@ -10,7 +10,6 @@ public sealed class BatteryMonitorService : IDisposable
     private readonly AppSettings _settings;
     private readonly IReadOnlyList<IBatteryReader> _readers;
     private readonly DispatcherTimer _timer;
-    private CancellationTokenSource? _refreshCts;
     private int _refreshInProgress;
     private readonly BatteryValueStabilizer _stabilizer = new();
 
@@ -20,35 +19,33 @@ public sealed class BatteryMonitorService : IDisposable
     public BatteryMonitorService(AppSettings settings)
     {
         _settings = settings;
-        // Realtime edition:
-        // - targeted active readers only for known devices (Razer mouse / Logitech headset).
-        // - QwertyKey stays passive to avoid input interference.
-        // - fast polling is protected by a re-entrancy guard, so readers never stack on top of each other.
+
+        // Absolute safety rule:
+        // This build never runs a generic HID probe and never sends commands to unknown HID devices.
+        // Active commands are allowed only inside exact, isolated readers for known hardware IDs:
+        // - Razer Viper V2 Pro: VID_1532&PID_00A6 / VID_1532&PID_00A5
+        // - Logitech G733: VID_046D&PID_0AB5
+        // QwertyKey is passive-only. It is detected, but never queried actively.
+        _settings.EnableUniversalHidBatteryReader = false;
+
         var readers = new List<IBatteryReader>
         {
-            new SystemBatteryReader()
+            new SystemBatteryReader(),
+            new KnownVidPidPresenceReader(),
+            new RegistryKnownDeviceReader(),
+            new PnpBatteryPropertyReader(() => _settings.KnownDeviceHints)
         };
 
-        // Universal safe readers: these only ask Windows/HID for standard battery data.
-        // They do not send vendor commands to unknown devices.
-        if (_settings.EnableUniversalHidBatteryReader)
-        {
-            readers.Add(new StandardHidBatteryReader(() => _settings.KnownDeviceHints));
-        }
-
-        // Direct readers: enabled for known devices only. These improve accuracy for models
-        // that do not expose a normal Windows battery percentage.
         if (_settings.EnableRazerDirectBatteryReader)
-        {
             readers.Add(new RazerViperV2ProHidReader());
-            readers.Add(new HeadsetControlCliReader());
-            readers.Add(new LogitechG733DirectFrameReader());
-        }
 
-        readers.Add(new KnownVidPidPresenceReader());
-        readers.Add(new PnpBatteryPropertyReader(() => _settings.KnownDeviceHints));
-        readers.Add(new PnpPresenceReader(() => _settings.KnownDeviceHints));
-        readers.Add(new ExternalScriptReader(PathsService.ReadersFolder));
+        // Optional on-demand helper. It is not a background service and it is only used when
+        // headsetcontrol.exe exists in PATH or tools\headsetcontrol. It targets headsets only.
+        if (_settings.EnableHeadsetControlCliReader)
+            readers.Add(new HeadsetControlCliReader());
+
+        if (_settings.EnableLogitechG733DirectBatteryReader)
+            readers.Add(new LogitechG733DirectFrameReader());
 
         _readers = readers;
 
@@ -71,38 +68,35 @@ public sealed class BatteryMonitorService : IDisposable
 
     public async Task RefreshAsync()
     {
-        // Realtime mode can tick every 1-2 seconds. Never start a second HID poll while one is still running.
         if (Interlocked.Exchange(ref _refreshInProgress, 1) == 1)
             return;
 
         try
         {
-            _refreshCts?.Cancel();
-            _refreshCts?.Dispose();
-            _refreshCts = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Max(4, _settings.RefreshSeconds * 3)));
-            var token = _refreshCts.Token;
-
             var all = new List<DeviceBatteryInfo>();
+
             foreach (var reader in _readers)
             {
                 try
                 {
-                    var items = await reader.ReadAsync(token).ConfigureAwait(true);
+                    using var readerCts = new CancellationTokenSource(TimeSpan.FromSeconds(GetReaderTimeoutSeconds(reader)));
+                    var items = await reader.ReadAsync(readerCts.Token).ConfigureAwait(true);
                     all.AddRange(items);
                 }
                 catch (OperationCanceledException)
                 {
-                    // Fast realtime polling may cancel slow optional readers. Keep the last successful devices on screen.
+                    StartupLogger.Error($"Reader timed out safely: {reader.Name}");
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Readers are isolated. One broken reader must not break the overlay.
+                    StartupLogger.Error($"Reader failed: {reader.Name}", ex);
                 }
             }
 
             var merged = all
                 .Where(d => _settings.ShowLaptopBattery || !d.DeviceType.Equals("Laptop", StringComparison.OrdinalIgnoreCase))
-                .Where(d => _settings.ShowUnknownDevices || d.BatteryPercent.HasValue || d.IsCharging == true)
+                .Where(IsAllowedDevice)
+                .Where(d => d.BatteryPercent.HasValue || d.IsCharging == true || IsExactKnownTarget(d) || (_settings.ShowUnknownDevices && LooksWirelessPeripheral(d)))
                 .GroupBy(NormalizeKey, StringComparer.OrdinalIgnoreCase)
                 .Select(g =>
                 {
@@ -125,32 +119,95 @@ public sealed class BatteryMonitorService : IDisposable
         }
     }
 
+    private static int GetReaderTimeoutSeconds(IBatteryReader reader)
+    {
+        var name = reader.Name.ToLowerInvariant();
+        if (name.Contains("razer")) return 3;
+        if (name.Contains("headsetcontrol")) return 5;
+        if (name.Contains("g733") || name.Contains("logitech")) return 4;
+        if (name.Contains("pnp") || name.Contains("presence") || name.Contains("known usb") || name.Contains("registry")) return 10;
+        return 2;
+    }
+
+    private static bool IsAllowedDevice(DeviceBatteryInfo d)
+    {
+        if (d.DeviceType.Equals("Laptop", StringComparison.OrdinalIgnoreCase)) return true;
+        if (IsExactKnownTarget(d)) return true;
+
+        // Only show broader devices when they expose an actual battery/charging state and look wireless.
+        // This prevents random USB hubs, RGB controllers, monitors, storage and wired devices from appearing.
+        if (d.BatteryPercent.HasValue || d.IsCharging == true)
+            return LooksWirelessPeripheral(d);
+
+        return false;
+    }
+
+    private static bool IsExactKnownTarget(DeviceBatteryInfo d)
+    {
+        var text = CombinedText(d);
+        return text.Contains("vid_1532&pid_00a6") || text.Contains("vid_1532&pid_00a5") ||
+               text.Contains("razer viper v2 pro") || text.Contains("viper v2 pro") ||
+               text.Contains("vid_046d&pid_0ab5") || text.Contains("logitech g733") || text.Contains("g733") ||
+               text.Contains("vid_36b0&pid_3002") || text.Contains("qwertykey") || text.Contains("qwerty key");
+    }
+
+    private static bool LooksWirelessPeripheral(DeviceBatteryInfo d)
+    {
+        var text = CombinedText(d);
+
+        if (text.Contains("bth") || text.Contains("bluetooth") || text.Contains("ble") ||
+            text.Contains("wireless") || text.Contains("receiver") || text.Contains("dongle") ||
+            text.Contains("lightspeed"))
+            return true;
+
+        if (text.Contains("headset") || text.Contains("headphone") || text.Contains("earbud") ||
+            text.Contains("mouse") || text.Contains("keyboard") || text.Contains("controller") ||
+            text.Contains("gamepad"))
+            return true;
+
+        if (text.Contains("razer") || text.Contains("logitech") || text.Contains("steelseries") ||
+            text.Contains("hyperx") || text.Contains("corsair") || text.Contains("asus rog") ||
+            text.Contains("turtle beach") || text.Contains("sennheiser") || text.Contains("bose"))
+            return true;
+
+        if (text.Contains("xbox") || text.Contains("dualsense") || text.Contains("dualshock") ||
+            text.Contains("switch pro") || text.Contains("nintendo") || text.Contains("8bitdo") ||
+            text.Contains("sony"))
+            return true;
+
+        if (text.Contains("airpods") || text.Contains("buds") || text.Contains("earphone"))
+            return true;
+
+        return false;
+    }
+
+    private static string CombinedText(DeviceBatteryInfo d)
+        => $"{d.Name} {d.DeviceType} {d.Status} {d.Reader} {d.RawId}".ToLowerInvariant();
+
     private static string NormalizeKey(DeviceBatteryInfo d)
     {
-        var name = d.Name.ToLowerInvariant();
-        var raw = (d.RawId ?? string.Empty).ToLowerInvariant();
-        var combined = name + " " + raw;
+        var combined = CombinedText(d);
 
         if (combined.Contains("vid_046d&pid_0ab5") || combined.Contains("g733")) return "logitech-g733";
-        if (combined.Contains("vid_1532&pid_00a6") || combined.Contains("viper") || combined.Contains("razer")) return "razer-viper-v2-pro";
+        if (combined.Contains("vid_1532&pid_00a6") || combined.Contains("vid_1532&pid_00a5") || combined.Contains("viper") || combined.Contains("razer")) return "razer-viper-v2-pro";
         if (combined.Contains("vid_36b0&pid_3002") || combined.Contains("qwertykey") || combined.Contains("qwerty key")) return "qwertykey-keyboard";
-        if (combined.Contains("vid_046d") && (combined.Contains("mouse") || combined.Contains("keyboard") || combined.Contains("headset") || combined.Contains("logitech"))) return CompactKey("logitech", name, raw);
-        if (combined.Contains("vid_1038") || combined.Contains("steelseries")) return CompactKey("steelseries", name, raw);
-        if (combined.Contains("vid_1b1c") || combined.Contains("corsair")) return CompactKey("corsair", name, raw);
-        if (combined.Contains("vid_0951") || combined.Contains("hyperx") || combined.Contains("kingston")) return CompactKey("hyperx", name, raw);
-        if (combined.Contains("vid_0b05") || combined.Contains("asus") || combined.Contains("rog")) return CompactKey("asus", name, raw);
-        if (combined.Contains("vid_054c") || combined.Contains("dualsense") || combined.Contains("dualshock") || combined.Contains("sony")) return CompactKey("sony-controller", name, raw);
-        if (combined.Contains("vid_045e") || combined.Contains("xbox")) return CompactKey("xbox", name, raw);
-        if (combined.Contains("vid_057e") || combined.Contains("nintendo") || combined.Contains("switch pro")) return CompactKey("nintendo", name, raw);
-        if (name.Contains("laptop battery")) return "system-laptop";
-        return name;
+        if (combined.Contains("steelseries") || combined.Contains("arctis")) return CompactKey("steelseries", d.Name, d.RawId ?? string.Empty);
+        if (combined.Contains("hyperx")) return CompactKey("hyperx", d.Name, d.RawId ?? string.Empty);
+        if (combined.Contains("corsair")) return CompactKey("corsair", d.Name, d.RawId ?? string.Empty);
+        if (combined.Contains("xbox")) return CompactKey("xbox", d.Name, d.RawId ?? string.Empty);
+        if (combined.Contains("dualsense") || combined.Contains("dualshock") || combined.Contains("sony")) return CompactKey("sony-controller", d.Name, d.RawId ?? string.Empty);
+        if (combined.Contains("8bitdo")) return CompactKey("8bitdo", d.Name, d.RawId ?? string.Empty);
+        if (combined.Contains("switch pro") || combined.Contains("nintendo")) return CompactKey("nintendo", d.Name, d.RawId ?? string.Empty);
+        if (combined.Contains("laptop battery")) return "system-laptop";
+        return CompactKey("device", d.Name.ToLowerInvariant(), d.RawId ?? string.Empty);
     }
 
     private static string CompactKey(string prefix, string name, string raw)
     {
         var id = ExtractVidPid(raw);
         if (!string.IsNullOrWhiteSpace(id)) return $"{prefix}-{id}";
-        return $"{prefix}-{name}";
+        var safeName = new string(name.Where(ch => char.IsLetterOrDigit(ch) || ch == '-' || ch == '_').Take(40).ToArray());
+        return $"{prefix}-{safeName}";
     }
 
     private static string ExtractVidPid(string raw)
@@ -164,27 +221,35 @@ public sealed class BatteryMonitorService : IDisposable
         return devices
             .OrderByDescending(x => x.BatteryPercent.HasValue)
             .ThenByDescending(x => x.IsCharging == true)
+            .ThenByDescending(x => IsSuccessfulDirectReader(x))
+            .ThenByDescending(x => IsDirectReader(x))
             .ThenByDescending(x => !string.IsNullOrWhiteSpace(x.Status) && x.Status.StartsWith("OK", StringComparison.OrdinalIgnoreCase))
-            .ThenByDescending(x => x.Reader.Contains("native", StringComparison.OrdinalIgnoreCase) || x.Reader.Contains("HID++", StringComparison.OrdinalIgnoreCase))
-            .ThenByDescending(x => x.Reader.Contains("direct", StringComparison.OrdinalIgnoreCase))
-            .ThenByDescending(x => x.Reader.Contains("Known USB/HID", StringComparison.OrdinalIgnoreCase))
             .ThenByDescending(x => !x.Name.StartsWith("HID", StringComparison.OrdinalIgnoreCase) && !x.Name.Equals("USB Input Device", StringComparison.OrdinalIgnoreCase))
             .First();
+    }
+
+    private static bool IsSuccessfulDirectReader(DeviceBatteryInfo d)
+        => IsDirectReader(d) && d.BatteryPercent.HasValue && !d.Status.Contains("failed", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsDirectReader(DeviceBatteryInfo d)
+    {
+        var text = CombinedText(d);
+        return text.Contains("direct") || text.Contains("headsetcontrol") || text.Contains("zero-access hid");
     }
 
     private static int SortType(string deviceType) => deviceType.ToLowerInvariant() switch
     {
         "laptop" => 0,
         "mouse" => 1,
-        "keyboard" => 2,
-        "headset" => 3,
+        "headset" => 2,
+        "headphones" => 2,
+        "keyboard" => 3,
+        "controller" => 4,
         _ => 9
     };
 
     public void Dispose()
     {
         _timer.Stop();
-        _refreshCts?.Cancel();
-        _refreshCts?.Dispose();
     }
 }

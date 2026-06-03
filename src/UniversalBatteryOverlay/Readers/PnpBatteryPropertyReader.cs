@@ -1,13 +1,13 @@
-using System.Diagnostics;
 using System.Text.Json;
 using UniversalBatteryOverlay.Models;
+using UniversalBatteryOverlay.Utils;
 
 namespace UniversalBatteryOverlay.Readers;
 
 public sealed class PnpBatteryPropertyReader : IBatteryReader
 {
     private readonly Func<IReadOnlyList<string>> _getHints;
-    public string Name => "Windows PnP battery properties";
+    public string Name => "Passive Windows battery properties";
 
     public PnpBatteryPropertyReader(Func<IReadOnlyList<string>> getHints)
     {
@@ -22,64 +22,60 @@ public sealed class PnpBatteryPropertyReader : IBatteryReader
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        var regex = hints.Length == 0 ? "" : string.Join("|", hints);
+        var regex = hints.Length == 0 ? "a^" : string.Join("|", hints);
 
         var ps = $$"""
 $ErrorActionPreference = 'SilentlyContinue'
 $rx = '{{regex}}'
 $items = @()
-# v16: scan likely peripheral classes too, but only return devices that expose a real 0-100 battery value.
-# This keeps keyboard/headset support broad without sending HID commands or cluttering the overlay.
-$devices = Get-PnpDevice -PresentOnly | Where-Object {
-  $_.FriendlyName -and (
-    ($rx -and ($_.FriendlyName -match $rx -or $_.InstanceId -match $rx)) -or
-    ($_.Class -match 'Bluetooth|HIDClass|Keyboard|Mouse|MEDIA|AudioEndpoint') -or
-    ($_.InstanceId -match 'BTH|HID|USB')
-  )
+
+$devices = Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {
+    $_.FriendlyName -and (
+        ($_.FriendlyName -match $rx) -or ($_.InstanceId -match $rx) -or
+        ($_.InstanceId -match 'BTH|Bluetooth|BLE') -or
+        ($_.FriendlyName -match 'Wireless|Bluetooth|Receiver|Dongle|Headset|Headphone|Mouse|Keyboard|Controller')
+    )
 }
+
 foreach ($d in $devices) {
-  $props = Get-PnpDeviceProperty -InstanceId $d.InstanceId | Where-Object {
-    $_.KeyName -match 'Battery|Charge|Capacity|Power' -and $_.Data -ne $null
-  }
-  foreach ($p in $props) {
-    $val = $null
-    try { $val = [int]$p.Data } catch { $val = $null }
-    if ($val -ne $null -and $val -ge 0 -and $val -le 100) {
-      $items += [pscustomobject]@{
-        name = $d.FriendlyName
-        deviceType = $d.Class
-        batteryPercent = $val
-        status = 'OK'
-        reader = 'Windows PnP battery property'
-        rawId = $d.InstanceId
-        property = $p.KeyName
-      }
-      break
+    $isExactTarget = ($d.FriendlyName -match $rx) -or ($d.InstanceId -match $rx)
+    $looksWireless = ($d.InstanceId -match 'BTH|Bluetooth|BLE') -or ($d.FriendlyName -match 'Wireless|Bluetooth|Receiver|Dongle|Lightspeed')
+    $looksPeripheral = ($d.FriendlyName -match 'Headset|Headphone|Mouse|Keyboard|Controller') -or ($d.Class -match 'Bluetooth|HIDClass|Keyboard|Mouse|MEDIA|AudioEndpoint|Battery')
+    if (-not ($isExactTarget -or ($looksWireless -and $looksPeripheral))) { continue }
+
+    $props = Get-PnpDeviceProperty -InstanceId $d.InstanceId -ErrorAction SilentlyContinue | Where-Object {
+        $_.KeyName -match 'Battery|Charge|Capacity|Remaining' -and $_.Data -ne $null
     }
-  }
+
+    foreach ($p in $props) {
+        $val = $null
+        try { $val = [int]$p.Data } catch { $val = $null }
+        if ($val -ne $null -and $val -ge 0 -and $val -le 100) {
+            $charging = $null
+            if ($p.KeyName -match 'Charge|Charging') { $charging = $true }
+            $items += [pscustomobject]@{
+                name = $d.FriendlyName
+                deviceType = $d.Class
+                batteryPercent = $val
+                isCharging = $charging
+                status = 'OK from Windows property: ' + $p.KeyName
+                reader = 'Passive Windows battery property'
+                rawId = $d.InstanceId
+                property = $p.KeyName
+            }
+            break
+        }
+    }
 }
+
 $items | ConvertTo-Json -Compress -Depth 4
 """;
 
         try
         {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "powershell.exe",
-                Arguments = $"-NoProfile -ExecutionPolicy Bypass -Command \"{EscapeForCommand(ps)}\"",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                WindowStyle = ProcessWindowStyle.Hidden
-            };
-
-            using var process = Process.Start(psi);
-            if (process is null) return Array.Empty<DeviceBatteryInfo>();
-            var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            var stdout = await stdoutTask.ConfigureAwait(false);
-            if (string.IsNullOrWhiteSpace(stdout)) return Array.Empty<DeviceBatteryInfo>();
+            var stdout = await PowerShellScriptRunner.RunAsync(ps, TimeSpan.FromSeconds(6), cancellationToken).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(stdout) || !stdout.TrimStart().StartsWith("[", StringComparison.Ordinal) && !stdout.TrimStart().StartsWith("{", StringComparison.Ordinal))
+                return Array.Empty<DeviceBatteryInfo>();
 
             return Parse(stdout);
         }
@@ -102,17 +98,21 @@ $items | ConvertTo-Json -Compress -Depth 4
 
     private static DeviceBatteryInfo ToInfo(JsonElement item)
     {
-        var name = GetString(item, "name") ?? "PnP battery device";
+        var name = GetString(item, "name") ?? "Wireless battery device";
         int? percent = null;
         if (item.TryGetProperty("batteryPercent", out var bp) && bp.TryGetInt32(out var i)) percent = Math.Clamp(i, 0, 100);
+        bool? charging = null;
+        if (item.TryGetProperty("isCharging", out var ch) && ch.ValueKind is JsonValueKind.True or JsonValueKind.False) charging = ch.GetBoolean();
+        var rawId = GetString(item, "rawId");
         return new DeviceBatteryInfo
         {
-            Name = name,
-            DeviceType = GuessType(name, GetString(item, "deviceType")),
+            Name = PreferKnownName(name, rawId),
+            DeviceType = GuessType(name, GetString(item, "deviceType"), rawId),
             BatteryPercent = percent,
+            IsCharging = charging,
             Status = GetString(item, "status") ?? "OK",
-            Reader = GetString(item, "reader") ?? "Windows PnP battery property",
-            RawId = GetString(item, "rawId"),
+            Reader = GetString(item, "reader") ?? "Passive Windows battery property",
+            RawId = rawId,
             LastUpdated = DateTime.Now
         };
     }
@@ -120,18 +120,25 @@ $items | ConvertTo-Json -Compress -Depth 4
     private static string? GetString(JsonElement item, string name)
         => item.TryGetProperty(name, out var v) && v.ValueKind != JsonValueKind.Null ? v.ToString() : null;
 
-    private static string GuessType(string friendlyName, string? cls)
+    private static string PreferKnownName(string friendlyName, string? rawId)
     {
-        var text = $"{friendlyName} {cls}".ToLowerInvariant();
+        var text = $"{friendlyName} {rawId}";
+        if (text.Contains("VID_1532&PID_00A6", StringComparison.OrdinalIgnoreCase) || text.Contains("VID_1532&PID_00A5", StringComparison.OrdinalIgnoreCase) || text.Contains("Viper", StringComparison.OrdinalIgnoreCase)) return "Razer Viper V2 Pro";
+        if (text.Contains("VID_046D&PID_0AB5", StringComparison.OrdinalIgnoreCase) || text.Contains("G733", StringComparison.OrdinalIgnoreCase)) return "Logitech G733";
+        if (text.Contains("VID_36B0&PID_3002", StringComparison.OrdinalIgnoreCase) || text.Contains("QwertyKey", StringComparison.OrdinalIgnoreCase)) return "QwertyKey Keyboard";
+        return friendlyName;
+    }
+
+    private static string GuessType(string friendlyName, string? cls, string? rawId)
+    {
+        var text = $"{friendlyName} {cls} {rawId}".ToLowerInvariant();
         if (text.Contains("mouse") || text.Contains("viper")) return "Mouse";
         if (text.Contains("keyboard") || text.Contains("qwertykey")) return "Keyboard";
         if (text.Contains("headset") || text.Contains("headphone") || text.Contains("g733") || text.Contains("audio")) return "Headset";
+        if (text.Contains("controller") || text.Contains("xbox") || text.Contains("dualsense") || text.Contains("8bitdo")) return "Controller";
         return "Device";
     }
 
     private static string EscapeRegex(string value)
         => System.Text.RegularExpressions.Regex.Escape(value).Replace("'", "''");
-
-    private static string EscapeForCommand(string script)
-        => script.Replace("\"", "\\\"").Replace("\r", " ").Replace("\n", " ");
 }

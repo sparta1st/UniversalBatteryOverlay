@@ -25,7 +25,18 @@ public sealed class SettingsService
         {
             if (!File.Exists(_settingsPath)) return new AppSettings();
             var json = File.ReadAllText(_settingsPath);
-            return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+            var settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+
+            // Safety migration: older builds could leave experimental generic HID readers
+            // enabled in %APPDATA%. Force ONLY the generic/universal HID reader off so
+            // keyboard dongles are never probed automatically after upgrading.
+            // The Razer reader is narrowly targeted to the Viper mouse VID/PID and mouse collection.
+            settings.EnableUniversalHidBatteryReader = false;
+            settings.EnableRazerDirectBatteryReader = true;
+            settings.EnableLogitechG733DirectBatteryReader = true;
+            settings.EnableHeadsetControlCliReader = true;
+            settings.ShowUnknownDevices = true;
+            return settings;
         }
         catch
         {

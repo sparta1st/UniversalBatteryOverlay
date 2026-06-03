@@ -2,15 +2,13 @@ name: Build
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,16 +19,10 @@ jobs:
           dotnet-version: 8.0.x
 
       - name: Restore
-        run: dotnet restore src/UniversalBatteryOverlay/UniversalBatteryOverlay.csproj
+        run: dotnet restore src/UniversalBatteryOverlay/UniversalBatteryOverlay.csproj --configfile NuGet.config -r win-x64
 
       - name: Build
         run: dotnet build src/UniversalBatteryOverlay/UniversalBatteryOverlay.csproj -c Release --no-restore
 
-      - name: Publish win-x64
-        run: dotnet publish src/UniversalBatteryOverlay/UniversalBatteryOverlay.csproj -c Release -r win-x64 --self-contained false /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: UniversalBatteryOverlay-win-x64
-          path: src/UniversalBatteryOverlay/bin/Release/net8.0-windows/win-x64/publish/
+      - name: Publish
+        run: dotnet publish src/UniversalBatteryOverlay/UniversalBatteryOverlay.csproj -c Release -r win-x64 --self-contained false --no-restore /p:UseAppHost=true /p:PublishSingleFile=false

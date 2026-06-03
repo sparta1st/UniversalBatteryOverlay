@@ -2,37 +2,323 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Universal Battery Overlay"
-        Width="1080"
-        Height="760"
-        MinWidth="920"
-        MinHeight="640"
-        Background="{StaticResource BgBrush}"
+        Width="1220"
+        Height="920"
+        MinWidth="1080"
+        MinHeight="820"
+        Background="#050712"
         WindowStartupLocation="CenterScreen">
     <Window.Resources>
+        <SolidColorBrush x:Key="Surface0" Color="#050712" />
+        <SolidColorBrush x:Key="Surface1" Color="#0A1020" />
+        <SolidColorBrush x:Key="Surface2" Color="#0F172A" />
+        <SolidColorBrush x:Key="Surface3" Color="#111C31" />
+        <SolidColorBrush x:Key="Stroke1" Color="#243149" />
+        <SolidColorBrush x:Key="Stroke2" Color="#334155" />
+        <SolidColorBrush x:Key="Text1" Color="#F8FAFC" />
+        <SolidColorBrush x:Key="Text2" Color="#B6C2D6" />
+        <SolidColorBrush x:Key="Text3" Color="#7F8EA8" />
+        <SolidColorBrush x:Key="Purple" Color="#8B5CF6" />
+        <SolidColorBrush x:Key="PurpleDark" Color="#3B1A72" />
+        <SolidColorBrush x:Key="Cyan" Color="#38BDF8" />
+        <SolidColorBrush x:Key="Green" Color="#34D399" />
+        <SolidColorBrush x:Key="Red" Color="#FB7185" />
+
+        <DropShadowEffect x:Key="SoftShadow" BlurRadius="26" ShadowDepth="0" Opacity="0.24" Color="#000000" />
+        <DropShadowEffect x:Key="AccentShadow" BlurRadius="22" ShadowDepth="0" Opacity="0.30" Color="#7C3AED" />
+
         <Style x:Key="Card" TargetType="Border">
-            <Setter Property="Background" Value="#0D1320" />
-            <Setter Property="BorderBrush" Value="#253149" />
+            <Setter Property="Background" Value="#0A1020" />
+            <Setter Property="BorderBrush" Value="#243149" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="26" />
+            <Setter Property="CornerRadius" Value="24" />
             <Setter Property="Padding" Value="18" />
-            <Setter Property="Margin" Value="0,0,0,14" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
         </Style>
-        <Style x:Key="SmallTitle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#F8FAFC" />
-            <Setter Property="FontSize" Value="20" />
+
+        <Style x:Key="MiniCard" TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="CornerRadius" Value="18" />
+            <Setter Property="Padding" Value="14" />
+            <Setter Property="Background" Value="#0D1526" />
+        </Style>
+
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource Text1}" />
+            <Setter Property="FontSize" Value="18" />
             <Setter Property="FontWeight" Value="Bold" />
         </Style>
-        <Style x:Key="Muted" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#94A3B8" />
+
+        <Style x:Key="SmallTitle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource Text1}" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="MutedText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource Text2}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="LineHeight" Value="18" />
+        </Style>
+
+        <Style x:Key="TinyText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource Text3}" />
+            <Setter Property="FontSize" Value="11" />
             <Setter Property="TextWrapping" Value="Wrap" />
         </Style>
-        <Style x:Key="TinyPill" TargetType="Border">
-            <Setter Property="CornerRadius" Value="16" />
-            <Setter Property="Background" Value="#111C32" />
-            <Setter Property="BorderBrush" Value="#2B3750" />
+
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#D7E2F4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+
+        <Style x:Key="InputTextBox" TargetType="TextBox">
+            <Setter Property="Height" Value="40" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Background" Value="#081120" />
+            <Setter Property="Foreground" Value="#F8FAFC" />
+            <Setter Property="BorderBrush" Value="#29364D" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="10,6" />
-            <Setter Property="Margin" Value="4" />
+            <Setter Property="CaretBrush" Value="#F8FAFC" />
+            <Setter Property="SelectionBrush" Value="#7C3AED" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#8B5CF6" />
+                                <Setter TargetName="Border" Property="Background" Value="#0D1728" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#52627C" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Border" Property="Opacity" Value="0.72" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Foreground" Value="#F8FAFC" />
+            <Setter Property="Background" Value="#081120" />
+            <Setter Property="BorderBrush" Value="#29364D" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Foreground" Value="#F8FAFC" />
+                        <Setter Property="Background" Value="#081120" />
+                        <Setter Property="Padding" Value="12,8" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ComboBoxItem">
+                                    <Border x:Name="ItemBg" CornerRadius="8" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsHighlighted" Value="True">
+                                            <Setter TargetName="ItemBg" Property="Background" Value="#1B2A44" />
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="ItemBg" Property="Background" Value="#3B1A72" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="Toggle"
+                                          Focusable="False"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          ClickMode="Press"
+                                          Background="Transparent"
+                                          BorderThickness="0">
+                                <Border x:Name="Border"
+                                        Height="40"
+                                        CornerRadius="12"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        Padding="{TemplateBinding Padding}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ContentPresenter Content="{TemplateBinding SelectionBoxItem}"
+                                                          VerticalAlignment="Center"
+                                                          TextElement.Foreground="{TemplateBinding Foreground}"
+                                                          RecognizesAccessKey="True" />
+                                        <TextBlock Grid.Column="1" Text="⌄" Foreground="#94A3B8" FontSize="14" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True" Focusable="False" IsOpen="{TemplateBinding IsDropDownOpen}">
+                                <Border Background="#081120" BorderBrush="#334155" BorderThickness="1" CornerRadius="12" Padding="5" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+                                    <ScrollViewer MaxHeight="260" CanContentScroll="True">
+                                        <ItemsPresenter />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#8B5CF6" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#52627C" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="#E2E8F0" />
+            <Setter Property="Margin" Value="0,5,0,5" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal">
+                            <Border x:Name="Box" Width="18" Height="18" CornerRadius="6" Background="#081120" BorderBrush="#34445F" BorderThickness="1" VerticalAlignment="Center">
+                                <Path x:Name="Check" Data="M 4 9 L 8 13 L 15 5" Stroke="#FFFFFF" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Visibility="Collapsed" />
+                            </Border>
+                            <ContentPresenter Margin="9,0,0,0" VerticalAlignment="Center" RecognizesAccessKey="True" />
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="#7C3AED" />
+                                <Setter TargetName="Box" Property="BorderBrush" Value="#A78BFA" />
+                                <Setter TargetName="Check" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush" Value="#8B5CF6" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ProgressBar">
+            <Setter Property="Height" Value="7" />
+            <Setter Property="Foreground" Value="#8B5CF6" />
+            <Setter Property="Background" Value="#1E293B" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid x:Name="TemplateRoot" ClipToBounds="True">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="5" />
+                            <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" CornerRadius="5" HorizontalAlignment="Left" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ScrollViewer">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+
+        <Style x:Key="InvisibleRepeatButton" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="Transparent" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="Thumb">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border x:Name="ThumbBorder" CornerRadius="4" Background="#465875" Opacity="0.55" />
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ThumbBorder" Property="Opacity" Value="0.95" />
+                                <Setter TargetName="ThumbBorder" Property="Background" Value="#7C8EAA" />
+                            </Trigger>
+                            <Trigger Property="IsDragging" Value="True">
+                                <Setter TargetName="ThumbBorder" Property="Opacity" Value="1" />
+                                <Setter TargetName="ThumbBorder" Property="Background" Value="#A78BFA" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ScrollBar">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Width" Value="6" />
+            <Setter Property="MinWidth" Value="6" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid x:Name="Root" Width="6" Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource InvisibleRepeatButton}" Command="ScrollBar.PageUpCommand" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Margin="1" />
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource InvisibleRepeatButton}" Command="ScrollBar.PageDownCommand" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Orientation" Value="Horizontal">
+                                <Setter TargetName="Root" Property="Height" Value="6" />
+                                <Setter TargetName="Root" Property="Width" Value="Auto" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ListBox">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="#F8FAFC" />
+        </Style>
+
+        <Style TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
         </Style>
     </Window.Resources>
 
@@ -43,146 +329,125 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border CornerRadius="30" Padding="22" BorderBrush="#303A52" BorderThickness="1" Margin="0,0,0,14">
+        <Border Grid.Row="0" CornerRadius="28" Padding="18" BorderBrush="#2E3A54" BorderThickness="1" Margin="0,0,0,16" Effect="{StaticResource SoftShadow}">
             <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                    <GradientStop Color="#151A2A" Offset="0" />
-                    <GradientStop Color="#0B1220" Offset="0.52" />
-                    <GradientStop Color="#24123B" Offset="1" />
+                    <GradientStop Color="#101827" Offset="0" />
+                    <GradientStop Color="#081120" Offset="0.52" />
+                    <GradientStop Color="#24113E" Offset="1" />
                 </LinearGradientBrush>
             </Border.Background>
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="24" ShadowDepth="0" Opacity="0.22" />
-            </Border.Effect>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-
-                <StackPanel>
-                    <TextBlock Text="Universal Battery Overlay" Foreground="#F8FAFC" FontSize="31" FontWeight="Bold" />
-                    <TextBlock Text="Realtime wireless battery overlay. Close this window and it keeps running quietly in the tray." Foreground="#A6B0C3" FontSize="13" Margin="0,6,0,0" />
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Width="52" Height="52" CornerRadius="18" Background="#21153D" BorderBrush="#6542B7" BorderThickness="1" Margin="0,0,14,0" Effect="{StaticResource AccentShadow}">
+                        <TextBlock Text="⚡" FontSize="28" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#E9D5FF" />
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Universal Battery Overlay" Foreground="#F8FAFC" FontSize="27" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="Realtime wireless battery overlay. Clean UI, tray mode, keyboard-safe device readers." Foreground="#A8B3C8" FontSize="13" Margin="1,5,0,0" />
+                    </StackPanel>
                 </StackPanel>
-
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button x:Name="RefreshButton" Content="Refresh now" Click="RefreshButton_Click" Background="#7C3AED" BorderBrush="#A78BFA" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0">
+                    <Button x:Name="RefreshButton" Content="Refresh" Click="RefreshButton_Click" Background="#7C3AED" BorderBrush="#A78BFA" />
                     <Button x:Name="ToggleOverlayButton" Content="Hide overlay" Click="ToggleOverlayButton_Click" />
+                    <Button Content="Report bug" Click="ReportBug_Click" />
                 </StackPanel>
             </Grid>
         </Border>
 
         <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0">
-            <TabItem Header="Dashboard">
+            <TabItem Header="Overview">
                 <Grid Margin="0,16,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1.25*" />
-                        <ColumnDefinition Width="0.75*" />
+                        <ColumnDefinition Width="1.28*" />
+                        <ColumnDefinition Width="0.72*" />
                     </Grid.ColumnDefinitions>
-
-                    <Border Style="{StaticResource Card}" Margin="0,0,10,0">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
-                            <Grid Margin="2,0,2,14">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Text="Devices" Style="{StaticResource SmallTitle}" />
-                                    <TextBlock Text="Clean cards for every detected reader. The overlay only shows useful rows with a real percentage." Style="{StaticResource Muted}" Margin="0,5,0,0" />
-                                </StackPanel>
-                                <Border Grid.Column="1" Style="{StaticResource TinyPill}" VerticalAlignment="Center">
-                                    <TextBlock Text="Realtime 1s" Foreground="#C4B5FD" FontWeight="SemiBold" />
-                                </Border>
-                            </Grid>
-
-                            <ListBox x:Name="DevicesGrid"
-                                     Grid.Row="1"
-                                     Foreground="#F8FAFC"
-                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                     HorizontalContentAlignment="Stretch">
-                                <ListBox.ItemContainerStyle>
-                                    <Style TargetType="ListBoxItem">
-                                        <Setter Property="Padding" Value="0" />
-                                        <Setter Property="Margin" Value="0,0,0,10" />
-                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                        <Setter Property="Background" Value="Transparent" />
-                                        <Setter Property="BorderThickness" Value="0" />
-                                    </Style>
-                                </ListBox.ItemContainerStyle>
+                    <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,10,0">
+                        <DockPanel LastChildFill="True">
+                            <StackPanel DockPanel.Dock="Top" Margin="0,0,0,14">
+                                <TextBlock Text="Live devices" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="Only wireless targets and real battery-capable devices are shown in the overlay. Unsupported devices stay here for diagnostics." Style="{StaticResource MutedText}" Margin="0,6,0,0" />
+                            </StackPanel>
+                            <ListBox x:Name="DevicesGrid" ScrollViewer.VerticalScrollBarVisibility="Auto" HorizontalContentAlignment="Stretch">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <Border CornerRadius="22" Padding="14" BorderBrush="#2A3650" BorderThickness="1">
-                                            <Border.Background>
-                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                                    <GradientStop Color="#111827" Offset="0" />
-                                                    <GradientStop Color="#0A1020" Offset="1" />
-                                                </LinearGradientBrush>
-                                            </Border.Background>
+                                        <Border CornerRadius="22" Padding="14" BorderBrush="#28364F" BorderThickness="1" Background="#0C1424">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto" />
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-                                                <Border Width="46" Height="46" CornerRadius="16" Background="#192235" BorderBrush="#3B4A66" BorderThickness="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                                <Border Width="46" Height="46" CornerRadius="16" Background="#111C31" BorderBrush="#334155" BorderThickness="1" Margin="0,0,14,0">
                                                     <TextBlock Text="{Binding Icon}" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                 </Border>
                                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding TypeDisplay}" Foreground="#F8FAFC" FontSize="17" FontWeight="Bold" />
-                                                    <TextBlock Text="{Binding Name}" Foreground="#9AA7BD" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding TypeDisplay}" Foreground="#F8FAFC" FontSize="17" FontWeight="Bold" />
+                                                        <Border CornerRadius="10" Background="#11213A" BorderBrush="#263C62" BorderThickness="1" Padding="8,2" Margin="10,0,0,0">
+                                                            <TextBlock Text="{Binding ChargingDisplay}" Foreground="#A7F3D0" FontSize="10" FontWeight="SemiBold" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Name}" Foreground="#94A3B8" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" />
                                                     <TextBlock Text="{Binding CleanStatusDisplay}" Foreground="#7DD3FC" FontSize="12" FontWeight="SemiBold" Margin="0,6,0,0" />
+                                                    <ProgressBar Maximum="100" Value="{Binding BatteryPercent}" Width="260" Margin="0,10,0,0" HorizontalAlignment="Left" />
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
-                                                    <Border CornerRadius="18" Background="#182235" BorderBrush="#384761" BorderThickness="1" Padding="15,8" HorizontalAlignment="Right">
-                                                        <TextBlock Text="{Binding BatteryWithChargingDisplay}" Foreground="#F8FAFC" FontSize="18" FontWeight="Bold" />
+                                                    <Border CornerRadius="18" Background="#111827" BorderBrush="#3A4A66" BorderThickness="1" Padding="14,8">
+                                                        <TextBlock Text="{Binding BatteryWithChargingDisplay}" Foreground="#F8FAFC" FontSize="19" FontWeight="Bold" />
                                                     </Border>
-                                                    <TextBlock Text="{Binding LastUpdatedDisplay}" Foreground="#64748B" FontSize="10" HorizontalAlignment="Right" Margin="0,6,3,0" />
+                                                    <TextBlock Text="{Binding LastUpdatedDisplay}" Foreground="#64748B" FontSize="10" HorizontalAlignment="Right" Margin="0,7,2,0" />
                                                 </StackPanel>
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
-                        </Grid>
+                        </DockPanel>
                     </Border>
-
                     <StackPanel Grid.Column="1" Margin="10,0,0,0">
-                        <Border Style="{StaticResource Card}">
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                             <StackPanel>
-                                <TextBlock Text="Live overlay preview" Style="{StaticResource SmallTitle}" />
-                                <TextBlock Text="This mirrors the compact overlay style: less padding, clean rows, no extra text." Style="{StaticResource Muted}" Margin="0,5,0,12" />
-                                <Border x:Name="PreviewChrome" CornerRadius="13" Padding="5" Background="#C90B1020" BorderBrush="#344054" BorderThickness="1" HorizontalAlignment="Left">
-                                    <ItemsControl x:Name="PreviewItems" FontSize="14">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border CornerRadius="9" Background="#161E293B" Padding="7,2" Margin="0,1" MinWidth="112">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Text="{Binding TypeDisplay}" Foreground="#F8FAFC" FontWeight="SemiBold" Margin="0,0,14,0" />
-                                                        <TextBlock Grid.Column="1" Text="{Binding BatteryWithChargingDisplay}" Foreground="#F8FAFC" FontWeight="Bold" />
-                                                    </Grid>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
+                                <TextBlock Text="Overlay preview" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="Exactly what appears in the top-left overlay: type, charging icon and percentage." Style="{StaticResource MutedText}" Margin="0,6,0,14" />
+                                <Border Background="#070D19" CornerRadius="22" BorderBrush="#243149" BorderThickness="1" Padding="18">
+                                    <Border x:Name="PreviewChrome" CornerRadius="13" BorderBrush="#344054" BorderThickness="1" Padding="5" HorizontalAlignment="Left">
+                                        <ItemsControl x:Name="PreviewItems">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border CornerRadius="9" Background="{Binding PreviewRowBackgroundBrush, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            BorderBrush="{Binding PreviewBorderBrush, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            BorderThickness="1"
+                                                            Padding="{Binding PreviewRowPadding, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            Margin="{Binding PreviewRowMargin, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            MinWidth="{Binding PreviewRowMinWidth, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="{Binding TypeDisplay}" Foreground="{Binding PreviewTextBrush, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="SemiBold" Margin="0,0,14,0" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding BatteryWithChargingDisplay}" Foreground="{Binding PreviewValueBrush, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="Bold" />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Border>
                                 </Border>
                             </StackPanel>
                         </Border>
-
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
-                                <TextBlock Text="Quick actions" Style="{StaticResource SmallTitle}" />
-                                <TextBlock Text="The X button hides this window to tray. Use Exit only when you really want to stop monitoring." Style="{StaticResource Muted}" Margin="0,5,0,10" />
-                                <Button Content="Hide to tray" Click="MinimizeButton_Click" />
-                                <Button Content="Open custom readers folder" Click="OpenReadersFolder_Click" />
+                                <TextBlock Text="Quick actions" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="Close with X to keep the app in the tray. Use Exit to fully stop it." Style="{StaticResource MutedText}" Margin="0,6,0,12" />
+                                <Button x:Name="MinimizeButton" Content="Send to tray" Click="MinimizeButton_Click" />
+                                <Button Content="Open logs folder" Click="OpenLogsFolder_Click" />
+                                <Button x:Name="ExitButton" Content="Exit app" Click="ExitButton_Click" Background="#3B1721" BorderBrush="#7F1D1D" />
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -190,213 +455,337 @@
             </TabItem>
 
             <TabItem Header="Overlay">
-                <ScrollViewer Margin="0,16,0,0" VerticalScrollBarVisibility="Auto">
+                <ScrollViewer Margin="0,16,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="1*" />
                             <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="1.08*" />
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Margin="0,0,10,0">
-                            <Border Style="{StaticResource Card}">
-                                <StackPanel>
-                                    <TextBlock Text="Position" Style="{StaticResource SmallTitle}" />
-                                    <TextBlock Text="Choose the monitor and exact corner for the compact overlay." Style="{StaticResource Muted}" Margin="0,5,0,10" />
-                                    <Label Content="Monitor" />
-                                    <ComboBox x:Name="MonitorCombo" />
-                                    <Label Content="Position" />
-                                    <ComboBox x:Name="PositionCombo" />
-                                    <UniformGrid Columns="2">
-                                        <StackPanel>
-                                            <Label Content="Offset X" />
-                                            <TextBox x:Name="OffsetXBox" />
-                                        </StackPanel>
-                                        <StackPanel>
-                                            <Label Content="Offset Y" />
-                                            <TextBox x:Name="OffsetYBox" />
-                                        </StackPanel>
-                                    </UniformGrid>
-                                </StackPanel>
-                            </Border>
+                        <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,10,14">
+                            <StackPanel>
+                                <TextBlock Text="Placement" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="Choose the display, corner and exact offset." Style="{StaticResource MutedText}" Margin="0,6,0,16" />
 
-                            <Border Style="{StaticResource Card}">
-                                <StackPanel>
-                                    <TextBlock Text="Compact spacing" Style="{StaticResource SmallTitle}" />
-                                    <TextBlock Text="Use these to remove the big padding from the top-left display." Style="{StaticResource Muted}" Margin="0,5,0,10" />
-                                    <UniformGrid Columns="2">
-                                        <StackPanel>
-                                            <Label Content="Outer padding" />
-                                            <TextBox x:Name="OverlayPaddingBox" />
-                                        </StackPanel>
-                                        <StackPanel>
-                                            <Label Content="Minimum width" />
-                                            <TextBox x:Name="MinWidthBox" />
-                                        </StackPanel>
-                                    </UniformGrid>
-                                    <UniformGrid Columns="2">
-                                        <StackPanel>
-                                            <Label Content="Row padding X" />
-                                            <TextBox x:Name="RowPaddingXBox" />
-                                        </StackPanel>
-                                        <StackPanel>
-                                            <Label Content="Row padding Y" />
-                                            <TextBox x:Name="RowPaddingYBox" />
-                                        </StackPanel>
-                                    </UniformGrid>
-                                    <UniformGrid Columns="2">
-                                        <StackPanel>
-                                            <Label Content="Row spacing" />
-                                            <TextBox x:Name="RowSpacingBox" />
-                                        </StackPanel>
-                                        <StackPanel>
-                                            <Label Content="Corner radius" />
-                                            <TextBox x:Name="CornerRadiusBox" />
-                                        </StackPanel>
-                                    </UniformGrid>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
+                                <TextBlock Text="Display" Style="{StaticResource FieldLabel}" />
+                                <ComboBox x:Name="MonitorCombo" Width="285" HorizontalAlignment="Left" />
 
-                        <StackPanel Grid.Column="1" Margin="10,0,0,0">
-                            <Border Style="{StaticResource Card}">
-                                <StackPanel>
-                                    <TextBlock Text="Appearance" Style="{StaticResource SmallTitle}" />
-                                    <TextBlock Text="Keep it elegant and readable without taking space on screen." Style="{StaticResource Muted}" Margin="0,5,0,10" />
-                                    <UniformGrid Columns="2">
-                                        <StackPanel>
-                                            <Label Content="Text size" />
-                                            <TextBox x:Name="FontSizeBox" />
-                                        </StackPanel>
-                                        <StackPanel>
-                                            <Label Content="Overlay opacity" />
-                                            <TextBox x:Name="OpacityBox" />
-                                        </StackPanel>
-                                    </UniformGrid>
-                                    <Label Content="Background opacity" />
-                                    <TextBox x:Name="BgOpacityBox" />
-                                    <CheckBox x:Name="ShowOverlayBackgroundCheck" Content="Show glass background" />
-                                    <CheckBox x:Name="ShowOverlayShadowCheck" Content="Show soft shadow" />
-                                    <CheckBox x:Name="ClickThroughCheck" Content="Click-through overlay" />
-                                </StackPanel>
-                            </Border>
+                                <TextBlock Text="Position" Style="{StaticResource FieldLabel}" Margin="0,14,0,6" />
+                                <ComboBox x:Name="PositionCombo" Width="185" HorizontalAlignment="Left" />
 
-                            <Border Style="{StaticResource Card}">
-                                <StackPanel>
-                                    <TextBlock Text="Preview" Style="{StaticResource SmallTitle}" />
-                                    <TextBlock Text="Save after changing spacing or opacity, then the real overlay updates instantly." Style="{StaticResource Muted}" Margin="0,5,0,12" />
-                                    <Border CornerRadius="13" Padding="5" Background="#C90B1020" BorderBrush="#344054" BorderThickness="1" HorizontalAlignment="Left">
-                                        <StackPanel>
-                                            <Border CornerRadius="9" Background="#161E293B" Padding="7,2" Margin="0,1" MinWidth="112">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Text="Mouse" Foreground="#F8FAFC" FontWeight="SemiBold" Margin="0,0,14,0" />
-                                                    <TextBlock Grid.Column="1" Text="40%" Foreground="#F8FAFC" FontWeight="Bold" />
-                                                </Grid>
-                                            </Border>
-                                            <Border CornerRadius="9" Background="#161E293B" Padding="7,2" Margin="0,1" MinWidth="112">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <TextBlock Text="Headset" Foreground="#F8FAFC" FontWeight="SemiBold" Margin="0,0,14,0" />
-                                                    <TextBlock Grid.Column="1" Text="⚡ 55%" Foreground="#F8FAFC" FontWeight="Bold" />
-                                                </Grid>
-                                            </Border>
-                                        </StackPanel>
+                                <Grid Margin="0,16,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                                        <TextBlock Text="Offset X" Style="{StaticResource FieldLabel}" />
+                                        <TextBox x:Name="OffsetXBox" Style="{StaticResource InputTextBox}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                                        <TextBlock Text="Offset Y" Style="{StaticResource FieldLabel}" />
+                                        <TextBox x:Name="OffsetYBox" Style="{StaticResource InputTextBox}" />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource Card}" Margin="10,0,10,14">
+                            <StackPanel>
+                                <TextBlock Text="Realtime" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="Keep updates fast without unsafe keyboard scans." Style="{StaticResource MutedText}" Margin="0,6,0,16" />
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                                        <TextBlock Text="Refresh seconds" Style="{StaticResource FieldLabel}" />
+                                        <TextBox x:Name="RefreshSecondsBox" Style="{StaticResource InputTextBox}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                                        <TextBlock Text="Low battery threshold" Style="{StaticResource FieldLabel}" />
+                                        <TextBox x:Name="LowBatteryBox" Style="{StaticResource InputTextBox}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Border Style="{StaticResource MiniCard}" Margin="0,16,0,8">
+                                    <StackPanel>
+                                        <CheckBox x:Name="StartWithWindowsCheck" Content="Start with Windows" />
+                                        <CheckBox x:Name="ClickThroughCheck" Content="Click-through overlay" />
+                                        <TextBlock Text="Click-through means the overlay will not steal clicks while gaming." Style="{StaticResource TinyText}" Margin="0,8,0,0" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Row="0" Grid.Column="2" Grid.RowSpan="2" Style="{StaticResource Card}" Margin="10,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="Visual style" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="Fine-tune size, spacing, opacity and overlay colors." Style="{StaticResource MutedText}" Margin="0,6,0,16" />
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                                        <TextBlock Text="Opacity" Style="{StaticResource FieldLabel}" />
+                                        <TextBox x:Name="OpacityBox" Style="{StaticResource InputTextBox}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                                        <TextBlock Text="Background opacity" Style="{StaticResource FieldLabel}" />
+                                        <TextBox x:Name="BgOpacityBox" Style="{StaticResource InputTextBox}" />
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                                        <TextBlock Text="Font size" Style="{StaticResource FieldLabel}" />
+                                        <TextBox x:Name="FontSizeBox" Style="{StaticResource InputTextBox}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                                        <TextBlock Text="Corner radius" Style="{StaticResource FieldLabel}" />
+                                        <TextBox x:Name="CornerRadiusBox" Style="{StaticResource InputTextBox}" />
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                                        <TextBlock Text="Outer padding" Style="{StaticResource FieldLabel}" />
+                                        <TextBox x:Name="OverlayPaddingBox" Style="{StaticResource InputTextBox}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                                        <TextBlock Text="Minimum width" Style="{StaticResource FieldLabel}" />
+                                        <TextBox x:Name="MinWidthBox" Style="{StaticResource InputTextBox}" />
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                                        <TextBlock Text="Row padding X" Style="{StaticResource FieldLabel}" />
+                                        <TextBox x:Name="RowPaddingXBox" Style="{StaticResource InputTextBox}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                                        <TextBlock Text="Row padding Y" Style="{StaticResource FieldLabel}" />
+                                        <TextBox x:Name="RowPaddingYBox" Style="{StaticResource InputTextBox}" />
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                                        <TextBlock Text="Row spacing" Style="{StaticResource FieldLabel}" />
+                                        <TextBox x:Name="RowSpacingBox" Style="{StaticResource InputTextBox}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                                        <TextBlock Text="Border color" Style="{StaticResource FieldLabel}" />
+                                        <TextBox x:Name="BorderColorBox" Style="{StaticResource InputTextBox}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Border Style="{StaticResource MiniCard}" Margin="0,16,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Colors" Style="{StaticResource SmallTitle}" />
+                                        <TextBlock Text="Use hex values like #0B1020. The live preview updates after saving." Style="{StaticResource TinyText}" Margin="0,4,0,12" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                                                <TextBlock Text="Background" Style="{StaticResource FieldLabel}" />
+                                                <TextBox x:Name="BgColorBox" Style="{StaticResource InputTextBox}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                                                <TextBlock Text="Row background" Style="{StaticResource FieldLabel}" />
+                                                <TextBox x:Name="RowBgColorBox" Style="{StaticResource InputTextBox}" />
+                                            </StackPanel>
+                                        </Grid>
+                                        <Grid Margin="0,12,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                                                <TextBlock Text="Text" Style="{StaticResource FieldLabel}" />
+                                                <TextBox x:Name="TextColorBox" Style="{StaticResource InputTextBox}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                                                <TextBlock Text="Percentage" Style="{StaticResource FieldLabel}" />
+                                                <TextBox x:Name="ValueColorBox" Style="{StaticResource InputTextBox}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <CheckBox x:Name="ShowOverlayBackgroundCheck" Content="Show background" Margin="0,14,0,0" />
+                                <CheckBox x:Name="ShowOverlayShadowCheck" Content="Show shadow" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Style="{StaticResource Card}" Margin="0,0,10,14">
+                            <StackPanel>
+                                <TextBlock Text="Live preview" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="Matches the real desktop overlay after you save settings." Style="{StaticResource MutedText}" Margin="0,6,0,14" />
+                                <Border Background="#070D19" CornerRadius="22" BorderBrush="#243149" BorderThickness="1" Padding="18">
+                                    <Border x:Name="OverlayTabPreviewChrome" CornerRadius="13" BorderBrush="#344054" BorderThickness="1" Padding="5" HorizontalAlignment="Left">
+                                        <ItemsControl x:Name="OverlayTabPreviewItems">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border CornerRadius="9"
+                                                            Background="{Binding PreviewRowBackgroundBrush, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            BorderBrush="{Binding PreviewBorderBrush, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            BorderThickness="1"
+                                                            Padding="{Binding PreviewRowPadding, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            Margin="{Binding PreviewRowMargin, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            MinWidth="{Binding PreviewRowMinWidth, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="{Binding TypeDisplay}" Foreground="{Binding PreviewTextBrush, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="SemiBold" Margin="0,0,14,0" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding BatteryWithChargingDisplay}" Foreground="{Binding PreviewValueBrush, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="Bold" />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
                                     </Border>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
                     </Grid>
                 </ScrollViewer>
             </TabItem>
 
             <TabItem Header="Devices">
-                <ScrollViewer Margin="0,16,0,0" VerticalScrollBarVisibility="Auto">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="1*" />
-                            <ColumnDefinition Width="1*" />
-                        </Grid.ColumnDefinitions>
-
-                        <Border Style="{StaticResource Card}" Margin="0,0,10,0">
-                            <StackPanel>
-                                <TextBlock Text="Supported device strategy" Style="{StaticResource SmallTitle}" />
-                                <TextBlock Text="The app tries Windows battery APIs, Bluetooth/PnP properties, standard HID battery reports, known device readers and custom plugins. It never sends active commands to unknown keyboards." Style="{StaticResource Muted}" Margin="0,5,0,12" />
-                                <CheckBox x:Name="EnableRazerDirectCheck" Content="Enable direct readers for supported devices" />
-                                <CheckBox x:Name="EnableUniversalHidCheck" Content="Enable universal Windows HID battery reader" />
-                                <CheckBox x:Name="ShowLaptopCheck" Content="Show laptop/system battery" />
-                                <CheckBox x:Name="ShowUnknownCheck" Content="Show detected devices without battery percentage in the app" />
-                                <Button Content="Open custom readers folder" Click="OpenReadersFolder_Click" />
-                            </StackPanel>
-                        </Border>
-
-                        <Border Grid.Column="1" Style="{StaticResource Card}" Margin="10,0,0,0">
-                            <StackPanel>
-                                <TextBlock Text="Extra device hints" Style="{StaticResource SmallTitle}" />
-                                <TextBlock Text="Add names or VID/PID strings for devices you want the app to keep visible and classify." Style="{StaticResource Muted}" Margin="0,5,0,10" />
-                                <ListBox x:Name="HintsList" Height="180" Background="#0B1220" Foreground="#F8FAFC" BorderBrush="#273244" Margin="4" />
-                                <TextBox x:Name="HintBox" ToolTip="Example: Razer, G733, QwertyKey, VID_1234&amp;PID_ABCD" />
-                                <UniformGrid Columns="2">
-                                    <Button Content="Add hint" Click="AddHint_Click" />
-                                    <Button Content="Remove selected" Click="RemoveHint_Click" />
-                                </UniformGrid>
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-                </ScrollViewer>
+                <Grid Margin="0,16,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.05*" />
+                        <ColumnDefinition Width="0.95*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="Reader safety" Style="{StaticResource SectionTitle}" />
+                            <TextBlock Text="Direct readers are isolated to exact hardware IDs. Unknown keyboards are never probed." Style="{StaticResource MutedText}" Margin="0,6,0,14" />
+                            <Border Background="#101D33" BorderBrush="#263C62" BorderThickness="1" CornerRadius="18" Padding="14" Margin="0,0,0,14">
+                                <StackPanel>
+                                    <TextBlock Text="Keyboard-safe mode" Foreground="#C4B5FD" FontWeight="Bold" />
+                                    <TextBlock Text="Universal HID scanning stays disabled to avoid keyboard interference." Style="{StaticResource TinyText}" Margin="0,5,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <CheckBox x:Name="RazerDirectCheck" Content="Enable Razer Viper V2 Pro direct battery reader" />
+                            <CheckBox x:Name="LogitechG733DirectCheck" Content="Enable Logitech G733 direct battery reader" />
+                            <CheckBox x:Name="HeadsetControlCheck" Content="Enable HeadsetControl helper if available" />
+                            <CheckBox x:Name="ShowLaptopCheck" Content="Show laptop/system battery" Margin="0,14,0,0" />
+                            <CheckBox x:Name="ShowUnknownCheck" Content="Show known wireless devices even when percentage is unavailable" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Style="{StaticResource Card}" Margin="10,0,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Device hints" Style="{StaticResource SectionTitle}" />
+                            <TextBlock Text="Add exact model names or VID/PID values so passive detection can group devices better." Style="{StaticResource MutedText}" Margin="0,6,0,14" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="HintBox" Grid.Column="0" Style="{StaticResource InputTextBox}" />
+                                <Button Grid.Column="1" Content="Add" Click="AddHint_Click" Margin="8,0,0,0" />
+                            </Grid>
+                            <ListBox x:Name="HintsList" Height="260" Margin="0,12,0,10" ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                            <Button Content="Remove selected" Click="RemoveHint_Click" HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
             </TabItem>
 
-            <TabItem Header="Advanced">
-                <ScrollViewer Margin="0,16,0,0" VerticalScrollBarVisibility="Auto">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="1*" />
-                            <ColumnDefinition Width="1*" />
-                        </Grid.ColumnDefinitions>
+            <TabItem Header="Safety">
+                <Grid Margin="0,16,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="No keyboard interference" Style="{StaticResource SectionTitle}" />
+                            <TextBlock Text="The app does not run generic HID scans. QwertyKey and unknown keyboards are passive-only. If a reader is enabled, it only targets its exact VID/PID hardware ID." Style="{StaticResource MutedText}" Margin="0,8,0,0" />
+                            <TextBlock Text="If any device behaves strangely, disable direct readers, restart the app and open an issue with logs." Style="{StaticResource MutedText}" Margin="0,12,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Style="{StaticResource Card}" Margin="10,0,0,0">
+                        <StackPanel>
+                            <TextBlock Text="What is experimental?" Style="{StaticResource SectionTitle}" />
+                            <TextBlock Text="Razer and Logitech battery readers use targeted vendor protocols because Windows often does not expose dongle battery levels normally." Style="{StaticResource MutedText}" Margin="0,8,0,0" />
+                            <TextBlock Text="For unsupported devices, create a device support request on GitHub with model, VID/PID and logs." Style="{StaticResource MutedText}" Margin="0,12,0,0" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
 
-                        <Border Style="{StaticResource Card}" Margin="0,0,10,0">
-                            <StackPanel>
-                                <TextBlock Text="Realtime" Style="{StaticResource SmallTitle}" />
-                                <TextBlock Text="Fast polling stays protected so a slow reader cannot overlap itself and freeze input." Style="{StaticResource Muted}" Margin="0,5,0,10" />
-                                <Label Content="Refresh every N seconds" />
-                                <TextBox x:Name="RefreshSecondsBox" />
-                                <Label Content="Low battery alert below (%)" />
-                                <TextBox x:Name="LowBatteryBox" />
-                                <CheckBox x:Name="StartWithWindowsCheck" Content="Start with Windows" />
-                            </StackPanel>
-                        </Border>
+            <TabItem Header="Diagnostics">
+                <Grid Margin="0,16,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="Logs" Style="{StaticResource SectionTitle}" />
+                            <TextBlock Text="Open the logs folder when reporting detection, tray or overlay problems." Style="{StaticResource MutedText}" Margin="0,6,0,14" />
+                            <Button Content="Open logs folder" Click="OpenLogsFolder_Click" HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Style="{StaticResource Card}" Margin="10,0,0,0">
+                        <StackPanel>
+                            <TextBlock Text="GitHub support" Style="{StaticResource SectionTitle}" />
+                            <TextBlock Text="Report bugs directly with issue templates. Include Windows version, device model, connection type and latest logs." Style="{StaticResource MutedText}" Margin="0,6,0,14" />
+                            <Button Content="Report a bug on GitHub" Click="ReportBug_Click" Background="#7C3AED" BorderBrush="#A78BFA" HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
 
-                        <Border Grid.Column="1" Style="{StaticResource Card}" Margin="10,0,0,0">
-                            <StackPanel>
-                                <TextBlock Text="Tray behavior" Style="{StaticResource SmallTitle}" />
-                                <TextBlock Text="Closing this window hides it to the tray. The overlay and battery monitor keep running in the background." Style="{StaticResource Muted}" Margin="0,5,0,12" />
-                                <Button Content="Hide to tray" Click="MinimizeButton_Click" />
-                                <Button Content="Refresh now" Click="RefreshButton_Click" />
-                                <Button Content="Exit completely" Click="ExitButton_Click" />
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-                </ScrollViewer>
+            <TabItem Header="About">
+                <Grid Margin="0,16,0,0">
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Universal Battery Overlay" Style="{StaticResource SectionTitle}" />
+                            <TextBlock Text="A clean Windows tray app for realtime wireless battery overlay. Built for gaming peripherals with a strong safety-first reader design." Style="{StaticResource MutedText}" Margin="0,8,0,0" />
+                            <TextBlock Text="Close the window with X to keep it running in the tray. Use Exit app to fully stop it." Style="{StaticResource MutedText}" Margin="0,12,0,0" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
             </TabItem>
         </TabControl>
 
-        <Border Grid.Row="2" Background="#0D1320" CornerRadius="24" Padding="13" BorderBrush="#253149" BorderThickness="1" Margin="0,14,0,0">
+        <Border Grid.Row="2" Background="#0A1020" BorderBrush="#243149" BorderThickness="1" CornerRadius="18" Padding="12" Margin="0,14,0,0">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock x:Name="StatusText" Text="Realtime monitoring is running. Close the window to keep it in the tray." Foreground="#94A3B8" VerticalAlignment="Center" Margin="8,0" />
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Button x:Name="ApplyButton" Content="Save changes" Click="ApplyButton_Click" Background="#7C3AED" BorderBrush="#A78BFA" />
-                    <Button x:Name="MinimizeButton" Content="Hide to tray" Click="MinimizeButton_Click" />
-                    <Button x:Name="ExitButton" Content="Exit" Click="ExitButton_Click" />
-                </StackPanel>
+                <TextBlock x:Name="StatusText" Text="Ready. Close with X to keep running in the tray." Foreground="#A7B2C6" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Content="Save settings" Click="ApplyButton_Click" Background="#7C3AED" BorderBrush="#A78BFA" Margin="0" />
             </Grid>
         </Border>
     </Grid>

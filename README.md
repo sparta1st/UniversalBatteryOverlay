@@ -1,174 +1,130 @@
 # Universal Battery Overlay
 
-A clean Windows 11 tray app that shows a compact realtime battery overlay for wireless devices such as mice, headsets, keyboards, controllers, and the system battery.
+Universal Battery Overlay is a Windows tray app that shows realtime battery information for wireless peripherals in a compact overlay.
 
-The app is built for a simple use case: keep a tiny overlay in the corner of your screen and see useful battery levels without keeping vendor apps open.
+It is designed for gaming and desktop setups where you want a small, clean overlay instead of keeping vendor apps open.
 
-## Features
+```text
+Mouse      40%
+Headset   ⚡ 61%
+Keyboard   85%
+```
+
+## Highlights
 
 - Compact always-on-top overlay.
-- Runs quietly in the Windows tray.
-- Closing the settings window with `X` hides it to the tray instead of exiting.
+- Runs in the Windows system tray.
+- Closing the settings window with **X** hides the app to the tray instead of exiting.
 - Realtime refresh, configurable from 1 second upward.
-- Clean English UI with sections for Dashboard, Overlay, Devices, and Advanced.
+- Clean English UI with organized tabs.
 - Live overlay preview inside the settings window.
-- Customizable overlay:
-  - monitor selection
-  - position
-  - offset X / Y
-  - text size
-  - opacity
-  - background opacity
-  - padding
-  - row spacing
-  - minimum width
-  - corner radius
-  - click-through mode
-- Charging indicator with `⚡` when a reader can detect charging.
-- Safe keyboard behavior: the app avoids sending unknown HID commands to keyboards.
-- Extensible reader system through PowerShell scripts in the `readers` folder.
+- Customizable overlay placement, size, spacing, opacity, colors and click-through mode.
+- Charging indicator with `⚡` when the reader can detect charging.
+- Wireless-focused device list so random USB devices do not clutter the UI.
+- Keyboard-safe reader model: no generic HID probing and no active commands sent to unknown keyboards.
+- Targeted direct readers for known hardware.
 
-## Current reader support
+## Current support
 
-The app tries multiple safe methods, from generic Windows APIs to device-specific readers.
+| Device / source | Status | Notes |
+|---|---:|---|
+| Razer Viper V2 Pro | Supported | Targeted direct reader for known Razer VID/PID paths. |
+| Logitech G733 | Experimental | Targeted G733 reader plus optional HeadsetControl helper. Some units may report unstable values while charging. |
+| QwertyKey wireless keyboard | Passive only | Detected safely. The app does not actively probe the keyboard. Battery appears only if Windows exposes it. |
+| Windows laptop/system battery | Supported | Works when a system battery is present. |
+| Bluetooth battery devices | Best effort | Works when Windows exposes battery properties. |
+| Other wireless devices | Best effort | Can be added through targeted readers or future device support requests. |
 
-| Device/source | Status |
-|---|---|
-| Windows system/laptop battery | Supported |
-| Windows PnP battery properties | Supported when exposed by Windows |
-| Standard HID battery strength | Optional, safe generic reader |
-| Razer Viper V2 Pro | Direct HID reader included |
-| Logitech G733 | Direct attempt + optional HeadsetControl helper |
-| QwertyKey / generic keyboards | Safe passive detection; battery only if exposed |
-| Bluetooth / controllers / common gaming brands | Best-effort detection through Windows/PnP/HID |
-| Custom devices | Supported through custom reader scripts |
+## Safety first
 
-## Honest limitation
+Older experimental builds used wider HID probing. That could interfere with some keyboards or dongles.
 
-No app can read the real battery percentage of every device in the world if the device or its 2.4 GHz dongle does not expose that information to Windows or through a known protocol.
+This clean build avoids that approach. It uses only:
 
-Universal Battery Overlay is designed to be honest:
+1. passive Windows device inventory;
+2. passive Windows battery properties;
+3. targeted readers for known hardware IDs.
 
-- If the app has a real percentage, it shows it.
-- If a device is detected but does not expose battery, the app does not invent a fake percentage.
-- If a charging state is available, the app shows `⚡`.
-- If a reader returns unstable values, the app stabilizes them instead of showing obvious spikes.
+The app does **not** run a generic HID scanner, and it does **not** send unknown HID commands to QwertyKey or other keyboards.
+
+See [Safety](docs/SAFETY.md) for more details.
 
 ## Requirements
 
 - Windows 11 or Windows 10.
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) for development/building from source.
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) for running from source.
 
-For normal use after publishing, users can run the built `.exe` without the SDK if you publish a self-contained build.
-
-## Quick start
-
-Download or clone the repository, then run:
-
-```bat
-CHECK_BUILD.bat
-START_APP.bat
-```
-
-The first launch can take a moment because .NET restores packages and builds the project.
-
-## Build
-
-```bat
-BUILD_APP.bat
-```
-
-or:
+Install the SDK with WinGet:
 
 ```powershell
-.\build.ps1
+winget install -e --id Microsoft.DotNet.SDK.8
 ```
 
-## Publish single EXE
+## Run from source
 
 ```bat
-MAKE_EXE.bat
+run.bat
 ```
 
-or:
+## Publish Windows EXE folder
 
-```powershell
-.\publish-single-exe.ps1
+```bat
+publish.bat
 ```
 
-The published executable will be created under:
+The published output is created under:
 
 ```text
 src\UniversalBatteryOverlay\bin\Release\net8.0-windows\win-x64\publish
 ```
 
-## Tray behavior
-
-- `X` on the settings window hides the window to tray.
-- Double-click the tray icon to reopen settings.
-- Right-click the tray icon for Open settings, Refresh now, Show/Hide overlay, and Exit.
-- Use Exit only when you want to fully stop monitoring.
-
-## Optional Logitech headset helper
-
-For some headsets, Windows does not expose battery level. The app can optionally call `HeadsetControl` as a short-lived command-line helper.
-
-Run:
-
-```bat
-INSTALL_HEADSETCONTROL.bat
-```
-
-This helper is not Logitech G HUB and does not stay running in the background. The app launches it only when it checks headset battery.
-
-If automatic installation fails, manually place `headsetcontrol.exe` here:
-
-```text
-tools\headsetcontrol\headsetcontrol.exe
-```
-
-## Custom reader scripts
-
-You can add custom battery readers without recompiling the app.
-
-Put a `.ps1` file in the `readers` folder. A reader should print JSON like this:
-
-```json
-[
-  {
-    "name": "My Wireless Device",
-    "deviceType": "Mouse",
-    "batteryPercent": 74,
-    "isCharging": false,
-    "status": "OK",
-    "reader": "My custom reader"
-  }
-]
-```
-
-See `docs/CUSTOM_READERS.md` for details.
-
-## Repository structure
+## Project structure
 
 ```text
 UniversalBatteryOverlay/
-├─ src/UniversalBatteryOverlay/     WPF app source
-├─ readers/                         optional custom PowerShell readers
-├─ docs/                            documentation
-├─ tools/                           optional local tools, ignored by Git
-├─ START_APP.bat                    easy run script
-├─ CHECK_BUILD.bat                  build verification script
-├─ MAKE_EXE.bat                     publish script
+├─ .github/                 GitHub Actions and issue templates
+├─ docs/                    Documentation
+├─ src/UniversalBatteryOverlay/
+│  ├─ Readers/              Device battery readers
+│  ├─ Services/             Monitoring, settings, logging and app control
+│  ├─ Models/               App settings and device data models
+│  └─ Utils/                Native Windows helpers
+├─ run.bat                  Run from source
+├─ publish.bat              Publish EXE folder
 ├─ README.md
+├─ CHANGELOG.md
+├─ ROADMAP.md
 └─ LICENSE
 ```
 
-## Safety notes
+## Reporting bugs
 
-The app uses a conservative approach for HID devices. It avoids active unknown commands on keyboards because some keyboards/dongles can behave badly if probed incorrectly. Device-specific HID commands are only used for readers where the protocol is known and intentionally targeted.
+Use the issue templates in the GitHub **Issues** tab:
 
-See `docs/SAFETY.md` for more details.
+- **Bug report** for crashes, UI problems, tray problems, wrong percentages or detection issues.
+- **Device support request** for new wireless devices.
+
+When reporting a device issue, include:
+
+- device model;
+- connection type: 2.4 GHz dongle, Bluetooth or wired;
+- whether the official vendor app shows a battery percentage;
+- whether Windows Device Manager shows the device;
+- screenshots if the issue is visual;
+- the latest log from:
+
+```text
+%APPDATA%\UniversalBatteryOverlay\logs
+```
+
+## Future plans
+
+See [Roadmap](ROADMAP.md) for planned improvements.
+
+## Changelog
+
+See [Changelog](CHANGELOG.md).
 
 ## License
 
-MIT License. See `LICENSE`.
+MIT License. See [LICENSE](LICENSE).
