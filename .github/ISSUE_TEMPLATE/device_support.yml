@@ -17,21 +17,49 @@ body:
       options:
         - 2.4 GHz dongle
         - Bluetooth
+        - USB receiver
         - USB cable
         - Unknown
     validations:
       required: true
+  - type: input
+    id: hardware-id
+    attributes:
+      label: Hardware ID / VID/PID
+      description: Find it in Device Manager → Properties → Details → Hardware Ids.
+      placeholder: VID_046D&PID_0AB5
+    validations:
+      required: false
   - type: textarea
     id: windows-detection
     attributes:
       label: How Windows detects it
-      description: Include Device Manager name, VID/PID if known, or screenshots.
+      description: Include Device Manager name, PnP name, class, screenshots or logs.
+    validations:
+      required: false
+  - type: dropdown
+    id: vendor-app
+    attributes:
+      label: Does the official app show battery percentage?
+      options:
+        - "Yes"
+        - "No"
+        - "I do not use the official app"
+        - "I do not know"
+    validations:
+      required: true
+  - type: textarea
+    id: requested-support
+    attributes:
+      label: What should be added?
+      description: Passive profile only, real battery reader, charging state, wrong percentage fix, etc.
     validations:
       required: false
   - type: textarea
-    id: notes
+    id: logs
     attributes:
-      label: Notes
-      description: Mention whether the official app shows battery percentage.
+      label: Logs
+      description: Paste relevant logs from %APPDATA%\UniversalBatteryOverlay\logs.
+      render: text
     validations:
       required: false

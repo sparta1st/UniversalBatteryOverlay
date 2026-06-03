@@ -1,0 +1,29 @@
+[
+  {
+    "displayName": "Example Wireless Mouse",
+    "deviceType": "Mouse",
+    "hardwareIds": ["VID_1234&PID_ABCD"],
+    "aliases": ["Example Mouse", "Example 2.4G Mouse"],
+    "passiveOnly": true,
+    "showWhenDetectedWithoutBattery": true,
+    "notes": "Passive profile only. Battery appears if Windows exposes it."
+  },
+  {
+    "displayName": "Example Wireless Headset",
+    "deviceType": "Headset",
+    "hardwareIds": ["VID_5678&PID_EF01"],
+    "aliases": ["Example Headset", "Example Gaming Headset"],
+    "passiveOnly": true,
+    "showWhenDetectedWithoutBattery": true,
+    "notes": "Use exact model names or VID/PID. Do not use broad tokens such as USB or Wireless."
+  },
+  {
+    "displayName": "Example Bluetooth Keyboard",
+    "deviceType": "Keyboard",
+    "hardwareIds": [],
+    "aliases": ["Example Keyboard K1"],
+    "passiveOnly": true,
+    "showWhenDetectedWithoutBattery": true,
+    "notes": "Keyboards should stay passive-only unless a safe dedicated reader is implemented."
+  }
+]

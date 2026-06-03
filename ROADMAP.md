@@ -1,56 +1,35 @@
 # Roadmap
 
-This roadmap tracks planned improvements for Universal Battery Overlay.
+This project should grow safely. The priority is: **no input interference, no lag, clean UI, accurate battery values when possible**.
 
-## Short-term
+## Short term
 
-- Improve the settings UI spacing and layout based on real desktop screenshots.
-- Add more overlay presets:
-  - Minimal;
-  - Gaming;
-  - Compact glass;
-  - High contrast.
-- Add a reset button for overlay appearance settings.
-- Add clearer device status messages in the Devices tab.
-- Add a button to open the logs folder from the UI.
-- Improve Logitech G733 stability while charging.
+- Add a device-support wizard that exports hardware IDs and diagnostic logs.
+- Add a safer profile editor inside the UI.
+- Add a release ZIP created automatically by GitHub Actions.
+- Add optional portable settings export/import.
+- Improve Logitech G733 battery parsing with more real-world samples.
 
-## Device support goals
+## Medium term
 
-- Add more targeted readers only when they can be implemented safely.
-- Avoid generic HID probing that can interfere with keyboard input.
-- Add device support through GitHub device-support requests.
-- Document hardware IDs for tested devices.
+- Add more exact targeted readers, one device family at a time:
+  - Logitech HID++ devices where safe;
+  - additional Razer mice with exact VID/PID paths;
+  - selected SteelSeries/Corsair/HyperX headsets if safe protocols are confirmed.
+- Add per-device refresh intervals.
+- Add per-device hide/rename controls.
+- Add tray notifications for low battery.
 
-Potential future targets:
+## Long term
 
-- More Logitech Lightspeed devices.
-- More Razer wireless devices.
-- SteelSeries wireless headsets.
-- Corsair wireless devices.
-- Xbox and PlayStation controllers when Windows exposes reliable battery data.
-- Bluetooth devices that expose standard battery services.
+- Create a community device database.
+- Add signed releases.
+- Add plugin API for safe model-specific readers.
+- Add optional cloud-free update checker.
 
-## UI goals
+## What will not be added by default
 
-- Cleaner modern dashboard.
-- Better visual hierarchy for the Overlay tab.
-- Better scrollbar styling.
-- Better color picker experience.
-- Theme presets.
-- Import/export settings profile.
-
-## Packaging goals
-
-- Add a GitHub Actions artifact for published builds.
-- Add versioned GitHub Releases.
-- Add a simple installer in the future.
-- Add signed releases if the project grows.
-
-## Safety rules that will stay
-
-- No generic HID scanner enabled by default.
-- No unknown commands sent to keyboards.
-- QwertyKey and unknown keyboards stay passive-only.
-- Direct readers must be targeted to exact known VID/PID paths.
-- If a device does not expose battery and no safe reader exists, the app should say that clearly instead of inventing a percentage.
+- Generic HID brute-force probing.
+- Active reads against unknown keyboards.
+- Background vendor-app dependencies as mandatory requirements.
+- Anything that risks breaking keyboard/mouse input.

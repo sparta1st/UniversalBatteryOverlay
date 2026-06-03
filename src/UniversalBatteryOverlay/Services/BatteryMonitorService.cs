@@ -9,9 +9,11 @@ public sealed class BatteryMonitorService : IDisposable
 {
     private readonly AppSettings _settings;
     private readonly IReadOnlyList<IBatteryReader> _readers;
+    private readonly DeviceProfileCatalog _profileCatalog;
     private readonly DispatcherTimer _timer;
     private int _refreshInProgress;
     private readonly BatteryValueStabilizer _stabilizer = new();
+    private readonly Dictionary<string, ReaderCacheEntry> _readerCache = new(StringComparer.OrdinalIgnoreCase);
 
     public ObservableCollection<DeviceBatteryInfo> Devices { get; } = new();
     public event EventHandler<IReadOnlyList<DeviceBatteryInfo>>? DevicesUpdated;
@@ -27,12 +29,17 @@ public sealed class BatteryMonitorService : IDisposable
         // - Logitech G733: VID_046D&PID_0AB5
         // QwertyKey is passive-only. It is detected, but never queried actively.
         _settings.EnableUniversalHidBatteryReader = false;
+        _profileCatalog = new DeviceProfileCatalog();
+        _settings.KnownDeviceHints = _settings.KnownDeviceHints
+            .Concat(_profileCatalog.PassiveBatteryHints)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         var readers = new List<IBatteryReader>
         {
             new SystemBatteryReader(),
-            new KnownVidPidPresenceReader(),
-            new RegistryKnownDeviceReader(),
+            new KnownVidPidPresenceReader(() => _profileCatalog.Profiles),
+            new RegistryKnownDeviceReader(() => _profileCatalog.Profiles),
             new PnpBatteryPropertyReader(() => _settings.KnownDeviceHints)
         };
 
@@ -77,11 +84,24 @@ public sealed class BatteryMonitorService : IDisposable
 
             foreach (var reader in _readers)
             {
+                var readerKey = reader.GetType().FullName ?? reader.Name;
+                var minInterval = GetReaderMinInterval(reader);
+
+                if (minInterval > TimeSpan.Zero
+                    && _readerCache.TryGetValue(readerKey, out var cached)
+                    && DateTime.UtcNow - cached.LastRunUtc < minInterval)
+                {
+                    all.AddRange(cached.Items);
+                    continue;
+                }
+
                 try
                 {
                     using var readerCts = new CancellationTokenSource(TimeSpan.FromSeconds(GetReaderTimeoutSeconds(reader)));
                     var items = await reader.ReadAsync(readerCts.Token).ConfigureAwait(true);
-                    all.AddRange(items);
+                    var safeItems = items.ToList();
+                    all.AddRange(safeItems);
+                    _readerCache[readerKey] = new ReaderCacheEntry(DateTime.UtcNow, safeItems);
                 }
                 catch (OperationCanceledException)
                 {
@@ -129,7 +149,22 @@ public sealed class BatteryMonitorService : IDisposable
         return 2;
     }
 
-    private static bool IsAllowedDevice(DeviceBatteryInfo d)
+    private static TimeSpan GetReaderMinInterval(IBatteryReader reader)
+    {
+        var name = reader.Name.ToLowerInvariant();
+
+        // The UI refresh can run every second, but slow inventory readers are cached.
+        // This keeps the overlay realtime for actual battery values while avoiding lag
+        // from repeated Windows PnP/CIM scans.
+        if (name.Contains("razer")) return TimeSpan.FromSeconds(2);
+        if (name.Contains("g733") || name.Contains("logitech")) return TimeSpan.FromSeconds(2);
+        if (name.Contains("headsetcontrol")) return TimeSpan.FromSeconds(10);
+        if (name.Contains("system")) return TimeSpan.FromSeconds(5);
+        if (name.Contains("pnp") || name.Contains("presence") || name.Contains("known usb") || name.Contains("registry") || name.Contains("profile detector")) return TimeSpan.FromSeconds(12);
+        return TimeSpan.Zero;
+    }
+
+    private bool IsAllowedDevice(DeviceBatteryInfo d)
     {
         if (d.DeviceType.Equals("Laptop", StringComparison.OrdinalIgnoreCase)) return true;
         if (IsExactKnownTarget(d)) return true;
@@ -142,13 +177,11 @@ public sealed class BatteryMonitorService : IDisposable
         return false;
     }
 
-    private static bool IsExactKnownTarget(DeviceBatteryInfo d)
+    private bool IsExactKnownTarget(DeviceBatteryInfo d)
     {
         var text = CombinedText(d);
-        return text.Contains("vid_1532&pid_00a6") || text.Contains("vid_1532&pid_00a5") ||
-               text.Contains("razer viper v2 pro") || text.Contains("viper v2 pro") ||
-               text.Contains("vid_046d&pid_0ab5") || text.Contains("logitech g733") || text.Contains("g733") ||
-               text.Contains("vid_36b0&pid_3002") || text.Contains("qwertykey") || text.Contains("qwerty key");
+        return _profileCatalog.Profiles.Any(profile => profile.MatchTokens.Any(token =>
+            !string.IsNullOrWhiteSpace(token) && text.Contains(token, StringComparison.OrdinalIgnoreCase)));
     }
 
     private static bool LooksWirelessPeripheral(DeviceBatteryInfo d)
@@ -189,11 +222,17 @@ public sealed class BatteryMonitorService : IDisposable
         var combined = CombinedText(d);
 
         if (combined.Contains("vid_046d&pid_0ab5") || combined.Contains("g733")) return "logitech-g733";
-        if (combined.Contains("vid_1532&pid_00a6") || combined.Contains("vid_1532&pid_00a5") || combined.Contains("viper") || combined.Contains("razer")) return "razer-viper-v2-pro";
+        if (combined.Contains("vid_1532&pid_00a6") || combined.Contains("vid_1532&pid_00a5") || combined.Contains("viper v2 pro")) return "razer-viper-v2-pro";
         if (combined.Contains("vid_36b0&pid_3002") || combined.Contains("qwertykey") || combined.Contains("qwerty key")) return "qwertykey-keyboard";
-        if (combined.Contains("steelseries") || combined.Contains("arctis")) return CompactKey("steelseries", d.Name, d.RawId ?? string.Empty);
-        if (combined.Contains("hyperx")) return CompactKey("hyperx", d.Name, d.RawId ?? string.Empty);
-        if (combined.Contains("corsair")) return CompactKey("corsair", d.Name, d.RawId ?? string.Empty);
+        if (combined.Contains("superlight")) return CompactKey("logitech-superlight", d.Name, d.RawId ?? string.Empty);
+        if (combined.Contains("mx master")) return CompactKey("logitech-mx-master", d.Name, d.RawId ?? string.Empty);
+        if (combined.Contains("mx keys")) return CompactKey("logitech-mx-keys", d.Name, d.RawId ?? string.Empty);
+        if (combined.Contains("g305") || combined.Contains("g304")) return CompactKey("logitech-g305", d.Name, d.RawId ?? string.Empty);
+        if (combined.Contains("g502")) return CompactKey("logitech-g502", d.Name, d.RawId ?? string.Empty);
+        if (combined.Contains("razer") || combined.Contains("deathadder") || combined.Contains("basilisk") || combined.Contains("cobra pro") || combined.Contains("naga v2")) return CompactKey("razer", d.Name, d.RawId ?? string.Empty);
+        if (combined.Contains("steelseries") || combined.Contains("arctis") || combined.Contains("aerox")) return CompactKey("steelseries", d.Name, d.RawId ?? string.Empty);
+        if (combined.Contains("hyperx") || combined.Contains("cloud flight") || combined.Contains("cloud alpha")) return CompactKey("hyperx", d.Name, d.RawId ?? string.Empty);
+        if (combined.Contains("corsair") || combined.Contains("virtuoso") || combined.Contains("hs80")) return CompactKey("corsair", d.Name, d.RawId ?? string.Empty);
         if (combined.Contains("xbox")) return CompactKey("xbox", d.Name, d.RawId ?? string.Empty);
         if (combined.Contains("dualsense") || combined.Contains("dualshock") || combined.Contains("sony")) return CompactKey("sony-controller", d.Name, d.RawId ?? string.Empty);
         if (combined.Contains("8bitdo")) return CompactKey("8bitdo", d.Name, d.RawId ?? string.Empty);
@@ -252,4 +291,7 @@ public sealed class BatteryMonitorService : IDisposable
     {
         _timer.Stop();
     }
+
+
+    private sealed record ReaderCacheEntry(DateTime LastRunUtc, IReadOnlyList<DeviceBatteryInfo> Items);
 }

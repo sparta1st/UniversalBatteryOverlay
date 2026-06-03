@@ -1,104 +1,54 @@
 # Changelog
 
-All notable changes to Universal Battery Overlay are documented here.
-
-## 0.34.1 - Clean GitHub release candidate
-
-### Fixed
-
-- Fixed WPF/WinForms namespace ambiguity for `Brush` in `MainWindow.xaml.cs`.
-- Prevented `System.Drawing.Brush` and `System.Windows.Media.Brush` conflicts by explicitly using WPF media brushes in UI preview code.
-
-### Changed
-
-- Prepared the project for a clean GitHub replacement upload.
-- Updated README with current run/publish instructions.
-- Removed outdated root-script instructions from documentation.
-- Clarified the current device-support model and keyboard-safety rules.
-- Added a clearer roadmap for future development.
-
-## 0.34.0 - Overlay layout and color customization
+## 0.36.0
 
 ### Added
 
-- Overlay color customization:
-  - background color;
-  - row background color;
-  - border color;
-  - text color;
-  - percentage color.
-- Improved overlay preview that mirrors the desktop overlay settings more closely.
+- Expanded built-in safe profiles for many more wireless devices:
+  - Logitech G/LIGHTSPEED/MX mice, keyboards and headsets;
+  - Razer wireless mice, keyboards and headsets;
+  - SteelSeries Arctis/Nova, Aerox, Rival, Prime and Apex families;
+  - Corsair wireless mice, keyboards and headsets;
+  - HyperX Cloud and Pulsefire wireless families;
+  - ASUS ROG/TUF wireless peripherals;
+  - Turtle Beach/ROCCAT, Glorious, Pulsar, Lamzu, Finalmouse, WLmouse, Ninjutso, Endgame Gear and Zowie devices;
+  - Keychron, NuPhy, Akko, Epomaker, Royal Kludge, Anne Pro and similar Bluetooth keyboards;
+  - Xbox, PlayStation, Nintendo, 8BitDo, Flydigi, GuliKit, SCUF and Victrix controllers;
+  - AirPods, Sony, Bose, Sennheiser, JBL, Beats, Jabra, Soundcore, Galaxy Buds, Pixel Buds and other Bluetooth headsets.
+- Reader cadence cache to reduce lag: slow Windows inventory readers are not executed every overlay tick.
+- Cleaner default filtering: unknown devices are hidden by default to avoid random USB clutter.
+- More polished button and tab styling in the main UI.
 
 ### Changed
 
-- Reworked the Overlay tab into clearer sections: Placement, Realtime and Visual style.
-- Made display and position selectors more compact.
-- Increased default app height to reduce cramped layouts.
-- Kept the working device-detection logic unchanged.
-
-## 0.33.0 - UI polish and monitor names
-
-### Added
-
-- Friendly monitor names such as `Display 1 · Primary · 1920×1080` instead of raw Windows display IDs.
-- Thin dark scrollbars.
-
-### Changed
-
-- Increased the default window height.
-- Reduced nested scrolling in settings pages.
-- Improved dark UI contrast for ComboBox and TextBox controls.
-- Improved the overlay preview layout.
-
-## 0.32.0 - Premium UI refresh
-
-### Added
-
-- Organized tabs:
-  - Overview;
-  - Overlay;
-  - Devices;
-  - Safety;
-  - Diagnostics;
-  - About.
-- Cleaner device cards and battery bars.
-
-### Changed
-
-- Refreshed the main UI theme.
-- Improved dark input styling.
-- Kept the working v31 device readers unchanged.
-
-## 0.31.0 - Build and Logitech reader fix
-
-### Fixed
-
-- Fixed C# overload ambiguity in the Logitech G733 direct reader caused by mixed `int` and HID report-length types.
-
-### Changed
-
-- Kept targeted-safe readers enabled.
 - Kept generic HID scanning disabled.
+- Kept QwertyKey and unknown keyboards passive-only.
+- Kept Razer Viper V2 Pro and Logitech G733 as targeted direct readers only.
+- Updated README, roadmap and device-support documentation.
 
-## 0.30.0 - Clean safe complete build
+### Safety
 
-### Changed
+- No new generic active probing was added.
+- Active reads remain limited to exact supported hardware IDs.
 
-- Cleaned the repository structure.
-- Kept only simple root scripts: `run.bat` and `publish.bat`.
-- Kept targeted device readers.
-- Preserved keyboard-safety rules.
+## 0.35.0
 
-## Earlier experimental builds
+### Added
 
-The project went through several experimental builds to test:
+- Device profile system for safe passive detection.
+- External `device-profiles.json` support.
+- Documentation for adding devices safely.
 
-- Razer Viper V2 Pro direct HID battery reading;
-- Logitech G733 direct frame reading;
-- charging detection;
-- realtime refresh;
-- tray behavior;
-- clean UI iterations;
-- keyboard-safe device filtering.
+## 0.34.1
 
-Some older approaches, especially wide/generic HID probing, were removed because they could interfere with keyboards or dongles.
+### Fixed
+
+- WPF/Windows Forms brush ambiguity in overlay UI customization build.
+
+## Earlier development builds
+
+- Added Windows tray behavior.
+- Added compact overlay.
+- Added Razer Viper V2 Pro targeted reader.
+- Added experimental Logitech G733 direct reader and optional HeadsetControl helper.
+- Added keyboard-safe mode after generic HID probing caused interference on some keyboards.

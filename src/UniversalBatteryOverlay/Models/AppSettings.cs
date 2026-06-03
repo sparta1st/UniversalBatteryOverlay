@@ -27,7 +27,7 @@ public sealed class AppSettings : INotifyPropertyChanged
     private bool _showOverlayBackground = true;
     private bool _showOverlayShadow = true;
     private bool _clickThrough = true;
-    private bool _showUnknownDevices = true;
+    private bool _showUnknownDevices = false;
     private bool _showLaptopBattery = true;
     private bool _startWithWindows = false;
     private bool _enableRazerDirectBatteryReader = true;

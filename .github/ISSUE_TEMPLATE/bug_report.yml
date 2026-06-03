@@ -15,7 +15,7 @@ body:
     id: version
     attributes:
       label: App version
-      placeholder: 0.34.1
+      placeholder: 0.35.0
     validations:
       required: true
   - type: dropdown

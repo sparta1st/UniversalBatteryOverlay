@@ -4,23 +4,44 @@ using UniversalBatteryOverlay.Utils;
 
 namespace UniversalBatteryOverlay.Readers;
 
+/// <summary>
+/// Passive wireless-device inventory reader.
+/// It does not open HID handles and does not send reports. It only asks Windows which devices exist.
+/// </summary>
 public sealed class KnownVidPidPresenceReader : IBatteryReader
 {
-    public string Name => "Safe wireless device presence";
+    private readonly Func<IReadOnlyList<DeviceProfile>> _getProfiles;
+    public string Name => "Safe wireless profile detector";
 
-    private static readonly KnownDevice[] KnownDevices =
+    public KnownVidPidPresenceReader(Func<IReadOnlyList<DeviceProfile>> getProfiles)
     {
-        new("Razer Viper V2 Pro", "Mouse", new[] { "VID_1532&PID_00A6", "VID_1532&PID_00A5", "Razer Viper V2 Pro", "Viper V2 Pro" }),
-        new("Logitech G733", "Headset", new[] { "VID_046D&PID_0AB5", "Logitech G733", "G733", "G733 Gaming Headset" }),
-        new("QwertyKey Keyboard", "Keyboard", new[] { "VID_36B0&PID_3002", "QwertyKey", "QWERTYKEY" })
-    };
+        _getProfiles = getProfiles;
+    }
 
     public async Task<IReadOnlyList<DeviceBatteryInfo>> ReadAsync(CancellationToken cancellationToken)
     {
-        const string script = @"
+        var profiles = _getProfiles()
+            .Where(p => p.MatchTokens.Any())
+            .ToList();
+
+        if (profiles.Count == 0)
+            return Array.Empty<DeviceBatteryInfo>();
+
+        var exactHardwareRegex = RegexFromTokens(profiles.SelectMany(p => p.HardwareIds));
+        var aliasRegex = RegexFromTokens(profiles.SelectMany(p => p.Aliases));
+        var rx = string.IsNullOrWhiteSpace(exactHardwareRegex)
+            ? aliasRegex
+            : string.IsNullOrWhiteSpace(aliasRegex)
+                ? exactHardwareRegex
+                : exactHardwareRegex + "|" + aliasRegex;
+
+        if (string.IsNullOrWhiteSpace(rx))
+            return Array.Empty<DeviceBatteryInfo>();
+
+        var script = $$"""
 $ErrorActionPreference = 'SilentlyContinue'
 $script:items = @()
-$needles = 'VID_1532&PID_00A6|VID_1532&PID_00A5|VID_046D&PID_0AB5|VID_36B0&PID_3002|Razer Viper V2 Pro|Viper V2 Pro|Logitech G733|G733|G733 Gaming Headset|QwertyKey|QWERTYKEY'
+$rx = '{{rx}}'
 
 function Add-Device($friendlyName, $className, $instanceId, $status, $source) {
     if ([string]::IsNullOrWhiteSpace($friendlyName) -and [string]::IsNullOrWhiteSpace($instanceId)) { return }
@@ -33,53 +54,36 @@ function Add-Device($friendlyName, $className, $instanceId, $status, $source) {
     }
 }
 
-# Source 1: present PnP inventory. Passive: it does not open HID handles.
+# Present PnP inventory. Passive only.
 Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {
-    ($_.FriendlyName -match $needles) -or ($_.InstanceId -match $needles)
+    ($_.FriendlyName -match $rx) -or ($_.InstanceId -match $rx)
 } | ForEach-Object {
     Add-Device $_.FriendlyName $_.Class $_.InstanceId $_.Status 'Get-PnpDevice PresentOnly'
 }
 
-# Source 2: full PnP inventory. Some wireless headsets appear here before their audio endpoint refreshes.
+# Full PnP inventory fallback. Some wireless dongles/headsets do not show in PresentOnly until a state change.
 Get-PnpDevice -ErrorAction SilentlyContinue | Where-Object {
-    ($_.FriendlyName -match $needles) -or ($_.InstanceId -match $needles)
+    ($_.FriendlyName -match $rx) -or ($_.InstanceId -match $rx)
 } | ForEach-Object {
     Add-Device $_.FriendlyName $_.Class $_.InstanceId $_.Status 'Get-PnpDevice All'
 }
 
-# Source 3: WMI/CIM fallback. Useful for G733 audio/media endpoints that Windows does not always
-# expose through the same PnP list until a charging/reconnect event occurs.
+# CIM PnP fallback.
 Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue | Where-Object {
-    ($_.Name -match $needles) -or ($_.DeviceID -match $needles)
+    ($_.Name -match $rx) -or ($_.DeviceID -match $rx)
 } | ForEach-Object {
     Add-Device $_.Name $_.PNPClass $_.DeviceID $_.Status 'Win32_PnPEntity'
 }
 
-# Source 4: audio devices fallback for wireless headsets like G733. Still passive.
+# Audio endpoint fallback for wireless headsets.
 Get-CimInstance Win32_SoundDevice -ErrorAction SilentlyContinue | Where-Object {
-    ($_.Name -match 'G733|Logitech') -or ($_.DeviceID -match 'VID_046D&PID_0AB5')
+    ($_.Name -match $rx) -or ($_.DeviceID -match $rx)
 } | ForEach-Object {
     Add-Device $_.Name 'MEDIA' $_.DeviceID $_.Status 'Win32_SoundDevice'
 }
 
-# Source 5: registry fallback for exact known USB/HID dongles. This avoids missing a device when
-# Windows does not refresh the audio endpoint until a charging/reconnect status change.
-foreach ($enumRoot in @('HKLM:\SYSTEM\CurrentControlSet\Enum\USB','HKLM:\SYSTEM\CurrentControlSet\Enum\HID')) {
-    foreach ($top in Get-ChildItem $enumRoot -ErrorAction SilentlyContinue) {
-        if ($top.PSChildName -match 'VID_1532&PID_00A6|VID_1532&PID_00A5|VID_046D&PID_0AB5|VID_36B0&PID_3002') {
-            foreach ($inst in Get-ChildItem $top.PSPath -ErrorAction SilentlyContinue) {
-                $props = Get-ItemProperty $inst.PSPath -ErrorAction SilentlyContinue
-                $friendly = $props.FriendlyName
-                if ([string]::IsNullOrWhiteSpace($friendly)) { $friendly = $props.DeviceDesc }
-                if ([string]::IsNullOrWhiteSpace($friendly)) { $friendly = $top.PSChildName }
-                Add-Device $friendly $props.Class ($inst.Name -replace '^HKEY_LOCAL_MACHINE\\','') 'Registry' 'Registry Enum'
-            }
-        }
-    }
-}
-
 $script:items | Where-Object { $_.FriendlyName -or $_.InstanceId } | Sort-Object InstanceId,FriendlyName,Source -Unique | ConvertTo-Json -Depth 4 -Compress
-";
+""";
 
         try
         {
@@ -90,11 +94,11 @@ $script:items | Where-Object { $_.FriendlyName -or $_.InstanceId } | Sort-Object
             var pnpDevices = ParseDevices(stdout);
             var results = new List<DeviceBatteryInfo>();
 
-            foreach (var known in KnownDevices)
+            foreach (var profile in profiles)
             {
                 var matches = pnpDevices
-                    .Where(d => known.Needles.Any(n => Contains(d.InstanceId, n) || Contains(d.FriendlyName, n)))
-                    .OrderBy(d => DeviceRank(d, known))
+                    .Where(d => profile.MatchTokens.Any(t => Contains(d.InstanceId, t) || Contains(d.FriendlyName, t)))
+                    .OrderBy(d => DeviceRank(d, profile))
                     .ToList();
 
                 var best = matches.FirstOrDefault();
@@ -102,11 +106,11 @@ $script:items | Where-Object { $_.FriendlyName -or $_.InstanceId } | Sort-Object
 
                 results.Add(new DeviceBatteryInfo
                 {
-                    Name = known.DisplayName,
-                    DeviceType = known.DeviceType,
+                    Name = profile.DisplayName,
+                    DeviceType = profile.DeviceType,
                     BatteryPercent = null,
                     IsCharging = null,
-                    Status = $"Detected safely via {best.Source}. Battery percentage depends on a specific reader or Windows exposure.",
+                    Status = $"Detected safely via {best.Source}. Battery requires Windows exposure or a dedicated reader.",
                     Reader = Name,
                     RawId = best.InstanceId ?? best.FriendlyName,
                     LastUpdated = DateTime.Now
@@ -115,26 +119,38 @@ $script:items | Where-Object { $_.FriendlyName -or $_.InstanceId } | Sort-Object
 
             return results;
         }
-        catch
+        catch (Exception ex)
         {
+            StartupLogger.Error("Safe profile detector failed", ex);
             return Array.Empty<DeviceBatteryInfo>();
         }
     }
 
+    private static string RegexFromTokens(IEnumerable<string> tokens)
+        => string.Join("|", tokens
+            .Where(t => !string.IsNullOrWhiteSpace(t) && t.Trim().Length >= 3)
+            .Select(EscapeRegex)
+            .Distinct(StringComparer.OrdinalIgnoreCase));
+
+    private static string EscapeRegex(string value)
+        => System.Text.RegularExpressions.Regex.Escape(value.Trim()).Replace("'", "''");
+
     private static bool Contains(string? text, string needle)
         => !string.IsNullOrWhiteSpace(text) && text.Contains(needle, StringComparison.OrdinalIgnoreCase);
 
-    private static int DeviceRank(PnpDevice device, KnownDevice known)
+    private static int DeviceRank(PnpDevice device, DeviceProfile profile)
     {
         var name = device.FriendlyName ?? string.Empty;
         var cls = device.Class ?? string.Empty;
         var source = device.Source ?? string.Empty;
-        var text = $"{name} {cls} {source}".ToLowerInvariant();
+        var id = device.InstanceId ?? string.Empty;
+        var text = $"{name} {cls} {source} {id}".ToLowerInvariant();
 
-        if (known.DeviceType == "Headset" && text.Contains("g733") && (text.Contains("media") || text.Contains("audio") || text.Contains("sound"))) return 0;
-        if (known.DeviceType == "Headset" && text.Contains("g733")) return 1;
-        if (known.DeviceType == "Mouse" && text.Contains("viper")) return 0;
-        if (known.DeviceType == "Keyboard" && (text.Contains("keyboard") || text.Contains("qwerty"))) return 0;
+        if (profile.HardwareIds.Any(h => id.Contains(h, StringComparison.OrdinalIgnoreCase))) return 0;
+        if (profile.DeviceType.Equals("Headset", StringComparison.OrdinalIgnoreCase) && (text.Contains("media") || text.Contains("audio") || text.Contains("sound"))) return 1;
+        if (profile.DeviceType.Equals("Mouse", StringComparison.OrdinalIgnoreCase) && text.Contains("mouse")) return 1;
+        if (profile.DeviceType.Equals("Keyboard", StringComparison.OrdinalIgnoreCase) && text.Contains("keyboard")) return 1;
+        if (profile.DeviceType.Equals("Controller", StringComparison.OrdinalIgnoreCase) && (text.Contains("controller") || text.Contains("gamepad"))) return 1;
         if (text.Contains("vendor-defined")) return 5;
         if (text.Contains("usb input device")) return 8;
         return 9;
@@ -173,8 +189,6 @@ $script:items | Where-Object { $_.FriendlyName -or $_.InstanceId } | Sort-Object
         if (!item.TryGetProperty(name, out var v) || v.ValueKind == JsonValueKind.Null) return null;
         return v.ToString();
     }
-
-    private sealed record KnownDevice(string DisplayName, string DeviceType, IReadOnlyList<string> Needles);
 
     private sealed class PnpDevice
     {

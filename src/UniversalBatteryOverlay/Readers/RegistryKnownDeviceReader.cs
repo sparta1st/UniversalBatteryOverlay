@@ -4,26 +4,27 @@ using UniversalBatteryOverlay.Models;
 namespace UniversalBatteryOverlay.Readers;
 
 /// <summary>
-/// Passive fallback inventory reader for exact known wireless devices.
-/// It only reads Windows registry inventory under HKLM\SYSTEM\CurrentControlSet\Enum.
-/// It never opens HID handles and never sends feature/output reports, so it cannot take over keyboard input.
+/// Passive fallback inventory reader for known wireless devices.
+/// It reads Windows registry inventory under HKLM\SYSTEM\CurrentControlSet\Enum only.
+/// It never opens HID handles and never sends feature/output reports.
 /// </summary>
 public sealed class RegistryKnownDeviceReader : IBatteryReader
 {
-    public string Name => "Safe Windows registry inventory";
-
-    private static readonly KnownDevice[] KnownDevices =
-    {
-        new("Razer Viper V2 Pro", "Mouse", new[] { "VID_1532&PID_00A6", "VID_1532&PID_00A5" }),
-        new("Logitech G733", "Headset", new[] { "VID_046D&PID_0AB5" }),
-        new("QwertyKey Keyboard", "Keyboard", new[] { "VID_36B0&PID_3002" })
-    };
+    private readonly Func<IReadOnlyList<DeviceProfile>> _getProfiles;
+    public string Name => "Safe Windows registry profile inventory";
 
     private static readonly string[] EnumRoots =
     {
         @"SYSTEM\CurrentControlSet\Enum\USB",
-        @"SYSTEM\CurrentControlSet\Enum\HID"
+        @"SYSTEM\CurrentControlSet\Enum\HID",
+        @"SYSTEM\CurrentControlSet\Enum\BTHENUM",
+        @"SYSTEM\CurrentControlSet\Enum\SWD"
     };
+
+    public RegistryKnownDeviceReader(Func<IReadOnlyList<DeviceProfile>> getProfiles)
+    {
+        _getProfiles = getProfiles;
+    }
 
     public Task<IReadOnlyList<DeviceBatteryInfo>> ReadAsync(CancellationToken cancellationToken)
     {
@@ -34,17 +35,17 @@ public sealed class RegistryKnownDeviceReader : IBatteryReader
 
         try
         {
-            foreach (var known in KnownDevices)
+            foreach (var profile in _getProfiles())
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var match = FindBestRegistryMatch(known, cancellationToken);
+                var match = FindBestRegistryMatch(profile, cancellationToken);
                 if (match is null) continue;
 
                 results.Add(new DeviceBatteryInfo
                 {
-                    Name = known.DisplayName,
-                    DeviceType = known.DeviceType,
+                    Name = profile.DisplayName,
+                    DeviceType = profile.DeviceType,
                     BatteryPercent = null,
                     IsCharging = null,
                     Status = "Detected safely from Windows registry inventory. No HID commands were sent.",
@@ -54,15 +55,15 @@ public sealed class RegistryKnownDeviceReader : IBatteryReader
                 });
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Registry inventory is best-effort only. Never break the app because of access/registry errors.
+            StartupLogger.Error("Registry profile inventory failed", ex);
         }
 
         return Task.FromResult<IReadOnlyList<DeviceBatteryInfo>>(results);
     }
 
-    private static string? FindBestRegistryMatch(KnownDevice known, CancellationToken cancellationToken)
+    private static string? FindBestRegistryMatch(DeviceProfile profile, CancellationToken cancellationToken)
     {
         foreach (var enumRoot in EnumRoots)
         {
@@ -73,52 +74,55 @@ public sealed class RegistryKnownDeviceReader : IBatteryReader
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (!known.HardwareIds.Any(id => deviceKeyName.Contains(id, StringComparison.OrdinalIgnoreCase)))
-                    continue;
+                var topMatches = profile.MatchTokens.Any(t => deviceKeyName.Contains(t, StringComparison.OrdinalIgnoreCase));
 
                 using var deviceKey = root.OpenSubKey(deviceKeyName);
                 if (deviceKey is null) continue;
 
                 var instances = deviceKey.GetSubKeyNames();
-                if (instances.Length == 0)
-                    return enumRoot + @"\" + deviceKeyName;
+                var instanceMatches = new List<RegistryMatch>();
 
-                // Prefer entries with a friendly name/device description. These are usually the active/current ones.
-                var best = instances
-                    .Select(instance => new RegistryMatch(
+                foreach (var instance in instances)
+                {
+                    using var instKey = deviceKey.OpenSubKey(instance);
+                    if (instKey is null) continue;
+
+                    var friendly = Convert.ToString(instKey.GetValue("FriendlyName"));
+                    var desc = Convert.ToString(instKey.GetValue("DeviceDesc"));
+                    var className = Convert.ToString(instKey.GetValue("Class"));
+                    var text = $"{deviceKeyName} {instance} {friendly} {desc} {className}";
+                    if (!topMatches && !profile.MatchTokens.Any(t => text.Contains(t, StringComparison.OrdinalIgnoreCase))) continue;
+
+                    instanceMatches.Add(new RegistryMatch(
                         Path: enumRoot + @"\" + deviceKeyName + @"\" + instance,
-                        Score: ScoreInstance(deviceKey.OpenSubKey(instance))))
-                    .OrderByDescending(x => x.Score)
-                    .FirstOrDefault();
+                        FriendlyName: friendly,
+                        DeviceDesc: desc,
+                        ClassName: className,
+                        Score: ScoreRegistryMatch(profile, text, friendly, desc, className)));
+                }
 
-                return best?.Path ?? enumRoot + @"\" + deviceKeyName + @"\" + instances[0];
+                var best = instanceMatches.OrderByDescending(x => x.Score).FirstOrDefault();
+                if (best is not null) return best.Path;
+
+                if (topMatches) return enumRoot + @"\" + deviceKeyName;
             }
         }
 
         return null;
     }
 
-    private static int ScoreInstance(RegistryKey? instanceKey)
+    private static int ScoreRegistryMatch(DeviceProfile profile, string text, string? friendly, string? desc, string? className)
     {
-        if (instanceKey is null) return 0;
-        using (instanceKey)
-        {
-            var friendly = instanceKey.GetValue("FriendlyName")?.ToString() ?? string.Empty;
-            var desc = instanceKey.GetValue("DeviceDesc")?.ToString() ?? string.Empty;
-            var cls = instanceKey.GetValue("Class")?.ToString() ?? string.Empty;
-            var problem = instanceKey.GetValue("Problem")?.ToString() ?? string.Empty;
-            var configFlags = instanceKey.GetValue("ConfigFlags")?.ToString() ?? string.Empty;
-
-            var score = 0;
-            if (!string.IsNullOrWhiteSpace(friendly)) score += 10;
-            if (!string.IsNullOrWhiteSpace(desc)) score += 3;
-            if (cls.Contains("MEDIA", StringComparison.OrdinalIgnoreCase) || cls.Contains("HIDClass", StringComparison.OrdinalIgnoreCase)) score += 3;
-            if (string.IsNullOrWhiteSpace(problem) || problem == "0") score += 2;
-            if (string.IsNullOrWhiteSpace(configFlags) || configFlags == "0") score += 2;
-            return score;
-        }
+        var score = 0;
+        foreach (var id in profile.HardwareIds)
+            if (text.Contains(id, StringComparison.OrdinalIgnoreCase)) score += 1000;
+        foreach (var alias in profile.Aliases)
+            if (text.Contains(alias, StringComparison.OrdinalIgnoreCase)) score += 100;
+        if (!string.IsNullOrWhiteSpace(friendly)) score += 50;
+        if (!string.IsNullOrWhiteSpace(desc)) score += 15;
+        if (!string.IsNullOrWhiteSpace(className) && className.Contains(profile.DeviceType, StringComparison.OrdinalIgnoreCase)) score += 25;
+        return score;
     }
 
-    private sealed record KnownDevice(string DisplayName, string DeviceType, IReadOnlyList<string> HardwareIds);
-    private sealed record RegistryMatch(string Path, int Score);
+    private sealed record RegistryMatch(string Path, string? FriendlyName, string? DeviceDesc, string? ClassName, int Score);
 }
