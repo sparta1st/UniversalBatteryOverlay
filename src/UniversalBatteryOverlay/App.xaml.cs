@@ -31,7 +31,8 @@ public partial class App : System.Windows.Application
 
         try
         {
-            StartupLogger.Info("App startup started.");
+            StartupLogger.Info("App startup started. ProcessPath=" + (Environment.ProcessPath ?? "unknown") + "; BaseDir=" + AppContext.BaseDirectory + "; CurrentDir=" + Directory.GetCurrentDirectory());
+            TrySetWorkingDirectoryToExeFolder();
             try { FormsApplication.EnableVisualStyles(); } catch { }
 
             _controller = new AppController();
@@ -51,6 +52,21 @@ public partial class App : System.Windows.Application
         try { _controller?.Dispose(); }
         catch (Exception ex) { StartupLogger.Error("Error while exiting", ex); }
         base.OnExit(e);
+    }
+
+    private static void TrySetWorkingDirectoryToExeFolder()
+    {
+        try
+        {
+            var exe = Environment.ProcessPath;
+            var folder = string.IsNullOrWhiteSpace(exe) ? null : Path.GetDirectoryName(exe);
+            if (!string.IsNullOrWhiteSpace(folder) && Directory.Exists(folder))
+                Directory.SetCurrentDirectory(folder);
+        }
+        catch (Exception ex)
+        {
+            StartupLogger.Error("Could not set working directory to EXE folder", ex);
+        }
     }
 
     private static void MessageBoxSafe(string message)

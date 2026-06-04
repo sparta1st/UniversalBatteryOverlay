@@ -21,3 +21,16 @@ Thumbs.db
 # Local tools / downloaded helpers
 tools/headsetcontrol/*
 !tools/headsetcontrol/.gitkeep
+echo UniversalBatteryOverlay_Portable.exe>>.gitignore
+echo dist/>>.gitignore
+echo *.exe>>.gitignore
+echo bin/>>.gitignore
+echo obj/>>.gitignore
+echo.>>.gitignore
+echo # Build outputs>>.gitignore
+echo dist/>>.gitignore
+echo bin/>>.gitignore
+echo obj/>>.gitignore
+echo *.exe>>.gitignore
+echo *.dll>>.gitignore
+echo *.pdb>>.gitignore

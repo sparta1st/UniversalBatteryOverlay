@@ -44,7 +44,13 @@ public sealed class AppController : IDisposable
         // The settings window is shown first. If tray creation fails for any reason,
         // the app still remains visible instead of disappearing silently.
         _mainWindow.Show();
-        StartupLogger.Info("Settings window shown.");
+        _mainWindow.ShowInTaskbar = true;
+        _mainWindow.WindowState = WindowState.Normal;
+        _mainWindow.Activate();
+        _mainWindow.Topmost = true;
+        _mainWindow.Topmost = false;
+        _mainWindow.Focus();
+        StartupLogger.Info("Settings window shown and activated.");
 
         try
         {
@@ -174,12 +180,26 @@ public sealed class AppController : IDisposable
     {
         try
         {
+            // In portable single-EXE builds there is no external app.ico next to the EXE.
+            // Load the embedded icon first so the EXE can be moved anywhere by itself.
+            var assembly = typeof(AppController).Assembly;
+            using var stream = assembly.GetManifestResourceStream("app.ico");
+            if (stream is not null)
+                return new System.Drawing.Icon(stream);
+        }
+        catch (Exception ex)
+        {
+            StartupLogger.Error("Could not load embedded tray icon", ex);
+        }
+
+        try
+        {
             var iconPath = Path.Combine(AppContext.BaseDirectory, "app.ico");
             if (File.Exists(iconPath)) return new System.Drawing.Icon(iconPath);
         }
         catch (Exception ex)
         {
-            StartupLogger.Error("Could not load tray icon", ex);
+            StartupLogger.Error("Could not load tray icon file", ex);
         }
 
         return System.Drawing.SystemIcons.Information;

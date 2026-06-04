@@ -1,167 +1,454 @@
 # Universal Battery Overlay
 
-Universal Battery Overlay is a clean Windows tray app that shows realtime battery information for wireless peripherals in a compact desktop overlay.
+A clean Windows 11 battery overlay for wireless peripherals.
 
-It is made for setups with gaming mice, wireless headsets, keyboards and controllers, without needing to keep every vendor app open.
+Universal Battery Overlay is a lightweight desktop app that shows the battery level of supported wireless devices in a small always-on-top overlay. It is designed for gaming and daily desktop use: minimal UI, real-time updates, tray behavior, safe device detection, and a portable EXE build.
+
+> Built for Windows 11. Focused on wireless mice, headsets, keyboards, controllers, and Bluetooth devices.
+
+---
+
+## Highlights
+
+* Clean always-on-top battery overlay
+* Real-time refresh
+* Tray icon support
+* Close-to-tray behavior
+* Portable single EXE build
+* Customizable overlay design
+* Multiple display support
+* Safe wireless device detection
+* No generic HID scanning by default
+* Targeted support for selected devices
+* Charging indicator with `⚡`
+* Battery stabilization while charging
+* GitHub-ready documentation and issue templates
+
+---
+
+## Preview
+
+Overlay example:
 
 ```text
 Mouse      40%
 Headset   ⚡ 61%
-Keyboard   85%
+Keyboard  85%
 ```
 
-## Highlights
+The overlay can be customized from the app:
 
-- Compact always-on-top overlay.
-- Clean dark UI with organized tabs: **Overview**, **Overlay**, **Devices**, **Safety**, **Diagnostics**, **About**.
-- Runs in the Windows tray; closing with **X** hides the settings window instead of exiting.
-- Realtime overlay refresh from 1 second upward.
-- Performance-safe reader cache: slow Windows inventory scans are cached so the app does not lag every second.
-- Customizable overlay placement, monitor, offset, opacity, row spacing, padding, corner radius and colors.
-- Charging icon `⚡` when a reader can detect charging.
-- Wireless-focused filtering so random USB hubs, monitors, RGB controllers and storage devices do not clutter the UI.
-- Keyboard-safe model: no generic HID probing and no active commands sent to unknown keyboards.
-- Targeted direct readers only for known hardware IDs.
-- Large built-in device-profile database for safe passive recognition.
-- External profile support through `device-profiles.json`.
-- GitHub issue templates for bugs and device-support requests.
+* Display selection
+* Position
+* Offset X / Y
+* Opacity
+* Background color
+* Text color
+* Percentage color
+* Padding
+* Row spacing
+* Corner radius
+* Shadow
+* Click-through mode
 
-## Support model
+---
 
-Universal support is handled in layers. This is the safest way to support many devices without breaking input devices.
+## Why this app exists
 
-| Level | Meaning | Battery percentage | Safety |
-|---|---|---:|---|
-| Targeted direct reader | Exact code for a known model/hardware ID. | Yes, when protocol works. | Active but isolated. |
-| Passive Windows battery | Windows exposes battery properties. | Yes. | Passive and safe. |
-| Optional helper | A trusted external CLI can query a supported headset. | Yes, when installed. | On-demand only. |
-| Passive profile detection | Device is recognized by name or VID/PID. | No, unless Windows exposes it. | Passive and safe. |
+Most wireless peripherals do not expose battery information in the same way.
 
-## Built-in targeted readers
+Some devices expose battery level directly through Windows.
+Some require vendor-specific HID commands.
+Some only expose battery through official software.
+Some do not expose battery to Windows at all.
 
-| Device | Status | Notes |
-|---|---:|---|
-| Razer Viper V2 Pro | Supported | Targeted zero-access HID reader for known Viper V2 Pro hardware IDs. |
-| Logitech G733 | Experimental | Targeted G733 reader plus optional HeadsetControl helper. Some devices report unstable values while charging, so values are stabilized. |
-| Windows laptop/system battery | Supported | Uses normal Windows battery APIs. |
+Universal Battery Overlay tries to support as many devices as possible while avoiding unsafe behavior, especially anything that could interfere with keyboard or mouse input.
 
-## Built-in passive profiles
+---
 
-The app includes safe passive profiles for many popular wireless-device families, including:
+## Safety First
 
-- Logitech G / LIGHTSPEED / MX mice, keyboards and headsets;
-- Razer Viper, DeathAdder, Basilisk, Naga, Cobra, BlackWidow, DeathStalker, BlackShark, Barracuda and Kraken families;
-- SteelSeries Arctis/Nova, Aerox, Rival, Prime and Apex wireless devices;
-- Corsair Virtuoso, HS, VOID, Dark Core, Harpoon, Katar, M75, Sabre and K-series wireless devices;
-- HyperX Cloud and Pulsefire wireless devices;
-- ASUS ROG/TUF wireless mice, keyboards and headsets;
-- Turtle Beach / ROCCAT wireless devices;
-- Glorious, Pulsar, Lamzu, Finalmouse, WLmouse, Ninjutso, Endgame Gear and Zowie wireless mice;
-- Keychron, NuPhy, Akko, Epomaker, Royal Kludge, Anne Pro and similar Bluetooth keyboards;
-- Xbox, DualSense, DualShock, Nintendo Switch Pro, 8BitDo, Flydigi, GuliKit, SCUF and Victrix controllers;
-- Apple AirPods, Sony, Bose, Sennheiser, JBL, Beats, Jabra, Soundcore, Galaxy Buds, Pixel Buds, Shokz and other Bluetooth headsets.
+This app is built around one important rule:
 
-Passive profile support means the app can recognize the device safely. A real percentage appears only when Windows exposes battery data or when a dedicated reader exists.
+> Do not break user input.
 
-## Safety first
+To avoid keyboard or dongle interference:
 
-Older experimental builds used wider HID probing. That can interfere with some keyboards or dongles.
+* Generic HID scanning is disabled by default.
+* Unknown keyboards are not actively queried.
+* QwertyKey-style keyboards are passive-only.
+* Targeted readers are used only for known devices.
+* Wireless detection prefers passive Windows APIs.
+* Potentially risky direct device access is isolated per-device.
 
-This build avoids that approach. It uses only:
+Read more in [Safety Notes](docs/SAFETY.md).
 
-1. passive Windows device inventory;
-2. passive Windows battery properties;
-3. passive device profiles;
-4. exact targeted readers for known hardware IDs;
-5. optional headset helper only when installed.
+---
 
-The app does **not** run a generic HID scanner, and it does **not** send unknown HID commands to keyboards such as QwertyKey.
+## Current Device Support
 
-See [Safety](docs/SAFETY.md) for more details.
+### Confirmed / Targeted
 
-## Requirements
+| Device                      |           Support | Notes                           |
+| --------------------------- | ----------------: | ------------------------------- |
+| Razer Viper V2 Pro          | Battery supported | Uses targeted direct reader     |
+| Logitech G733               |      Experimental | Targeted reader + stabilization |
+| QwertyKey wireless keyboard | Passive detection | No active commands for safety   |
 
-- Windows 11 or Windows 10.
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) for running from source.
+### Broad Passive Detection
 
-Install the SDK with WinGet:
+The app includes safe profiles for many wireless device families:
 
-```powershell
-winget install -e --id Microsoft.DotNet.SDK.8
+* Logitech G / LIGHTSPEED / MX
+* Razer wireless devices
+* SteelSeries Arctis / Aerox / Prime
+* Corsair wireless devices
+* HyperX wireless devices
+* ASUS ROG / TUF wireless
+* Turtle Beach / ROCCAT
+* Glorious
+* Pulsar
+* Lamzu
+* Finalmouse
+* Keychron
+* NuPhy
+* Akko
+* Xbox controllers
+* DualSense / DualShock controllers
+* Nintendo Switch Pro Controller
+* 8BitDo controllers
+* Bluetooth headsets
+* Bluetooth keyboards
+* Bluetooth mice
+* AirPods
+* Sony headphones
+* Bose headphones
+* JBL headphones
+* Beats headphones
+* Soundcore devices
+
+Passive detection means the app can detect the device without sending commands to it. Battery percentage appears only when Windows or a safe reader exposes it.
+
+Read more in [Device Support](docs/DEVICE_SUPPORT.md).
+
+---
+
+## Installation
+
+### Option 1: Portable EXE
+
+Download or build:
+
+```text
+UniversalBatteryOverlay_Portable.exe
 ```
 
-## Run from source
+Then run it from anywhere, including Desktop.
+
+No installer required.
+
+---
+
+### Option 2: Run from source
+
+Requirements:
+
+* Windows 11
+* .NET 8 SDK
+
+Run:
 
 ```bat
 run.bat
 ```
 
-## Publish Windows EXE folder
+---
+
+## Build Portable EXE
+
+Run:
 
 ```bat
 publish.bat
 ```
 
-The published output is created under:
+The portable EXE will be created as:
 
 ```text
-src\UniversalBatteryOverlay\bin\Release\net8.0-windows\win-x64\publish
+UniversalBatteryOverlay_Portable.exe
 ```
 
-## Adding device support
+You can copy only this EXE to Desktop or another folder.
 
-For safe passive detection, add a profile in `device-profiles.json`.
+---
 
-See [Adding devices](docs/ADDING_DEVICES.md).
+## GitHub Setup
 
-For real battery percentages on proprietary dongle devices, a dedicated reader may be required. Open a GitHub device-support issue with hardware IDs and logs.
+Clone the repository:
 
-## Project structure
+```bat
+git clone https://github.com/sparta1st/UniversalBatteryOverlay.git
+cd UniversalBatteryOverlay
+```
+
+Run the app:
+
+```bat
+run.bat
+```
+
+Publish the portable EXE:
+
+```bat
+publish.bat
+```
+
+Commit changes:
+
+```bat
+git add -A
+git commit -m "Update Universal Battery Overlay"
+git push
+```
+
+---
+
+## Clean Replace Local Repository
+
+To replace all project files while keeping Git history:
+
+```bat
+cd /d "C:\Users\SPARTA\Desktop\Proiecte\batt-clean"
+powershell -NoProfile -Command "Get-ChildItem -Force | Where-Object { $_.Name -ne '.git' } | Remove-Item -Recurse -Force"
+```
+
+Then copy the new project files into the folder and run:
+
+```bat
+git add -A
+git commit -m "Clean project update"
+git push
+```
+
+---
+
+## Project Structure
 
 ```text
-UniversalBatteryOverlay/
-├─ .github/                 GitHub Actions and issue templates
-├─ docs/                    Documentation
-├─ src/UniversalBatteryOverlay/
-│  ├─ Readers/              Device battery readers
-│  ├─ Services/             Monitoring, settings, logging and app control
-│  ├─ Models/               App settings, device data and device profiles
-│  └─ Utils/                Native Windows helpers
-├─ device-profiles.example.json
-├─ run.bat                  Run from source
-├─ publish.bat              Publish EXE folder
-├─ README.md
+UniversalBatteryOverlay
+├─ .github
+│  └─ ISSUE_TEMPLATE
+├─ docs
+│  ├─ ADDING_DEVICES.md
+│  ├─ CUSTOM_READERS.md
+│  ├─ DEVICE_SUPPORT.md
+│  ├─ DEVELOPMENT.md
+│  ├─ SAFETY.md
+│  └─ TROUBLESHOOTING.md
+├─ src
+│  └─ UniversalBatteryOverlay
 ├─ CHANGELOG.md
+├─ LICENSE
+├─ README.md
 ├─ ROADMAP.md
-└─ LICENSE
+├─ VERSION
+├─ run.bat
+└─ publish.bat
 ```
 
-## Reporting bugs
+The build is intentionally clean. Only the required scripts are kept in root.
 
-Use the issue templates in the GitHub **Issues** tab:
+---
 
-- **Bug report** for crashes, UI problems, tray problems, wrong percentages or detection issues.
-- **Device support request** for new wireless devices.
+## App Behavior
 
-When reporting a device issue, include:
+### Main Window
 
-- device model;
-- connection type: 2.4 GHz dongle, Bluetooth or wired;
-- hardware IDs;
-- whether the official vendor app shows a battery percentage;
-- whether Windows Device Manager shows the device;
-- screenshots if the issue is visual;
-- the latest log from:
+The main window contains sections for:
+
+* Overview
+* Overlay customization
+* Devices
+* Safety
+* Diagnostics
+* About
+
+### Tray Behavior
+
+When closing the window with `X`, the app stays active in the tray.
+
+Tray menu:
+
+* Open settings
+* Refresh now
+* Toggle overlay
+* Exit
+
+### Overlay
+
+The overlay is designed to be small, readable, and useful during gaming or work.
+
+Example:
+
+```text
+Mouse      40%
+Headset   ⚡ 61%
+Keyboard  85%
+```
+
+Devices without a real battery percentage are hidden from the overlay by default to avoid clutter.
+
+---
+
+## Charging Stabilization
+
+Some wireless devices report fake or unstable values while charging.
+
+Example:
+
+```text
+55% → 100% → 57% → 55%
+```
+
+Universal Battery Overlay filters unstable values and keeps the last trusted battery level while showing the charging indicator.
+
+Example:
+
+```text
+Headset   ⚡ 55%
+```
+
+This prevents fake instant jumps to 100%.
+
+---
+
+## Known Limitations
+
+* Some dongles do not expose battery data to Windows.
+* Some devices require official software to read battery.
+* Some devices report unstable values while charging.
+* Passive detection can detect a device without being able to read its battery.
+* Battery support depends on the device firmware, driver, and Windows exposure.
+
+The app avoids dangerous generic HID probing because it can interfere with keyboards and input devices.
+
+---
+
+## Adding More Devices
+
+Device support should be added safely.
+
+Preferred order:
+
+1. Passive Windows detection
+2. Known VID/PID profile
+3. Windows-exposed battery data
+4. Targeted direct reader for a specific device
+5. Optional helper integration
+6. Never use broad generic HID probing by default
+
+See [Adding Devices](docs/ADDING_DEVICES.md).
+
+---
+
+## Bug Reports
+
+Use GitHub Issues for bugs.
+
+Include:
+
+* Device name
+* Connection type
+* VID/PID, if available
+* Windows version
+* App version
+* Screenshot
+* Logs from:
 
 ```text
 %APPDATA%\UniversalBatteryOverlay\logs
 ```
 
-## Changelog and roadmap
+Open an issue here:
 
-- See [Changelog](CHANGELOG.md) for version changes.
-- See [Roadmap](ROADMAP.md) for future additions.
+```text
+https://github.com/sparta1st/UniversalBatteryOverlay/issues
+```
+
+---
+
+## Troubleshooting
+
+### The app does not open
+
+Run from CMD:
+
+```bat
+UniversalBatteryOverlay_Portable.exe
+```
+
+Then check logs:
+
+```text
+%APPDATA%\UniversalBatteryOverlay\logs
+```
+
+### The overlay does not show
+
+Open the tray icon and enable the overlay from settings.
+
+### A device is detected but battery is missing
+
+That usually means Windows can see the device, but the battery is not exposed safely.
+
+### Keyboard input feels broken
+
+Stop the app immediately and open a bug report. The app should not interfere with keyboard input.
+
+---
+
+## Roadmap
+
+Planned improvements:
+
+* Better Logitech headset support
+* More Razer wireless profiles
+* More SteelSeries profiles
+* More Corsair profiles
+* More controller support
+* Safer optional device-specific readers
+* Import/export overlay themes
+* Installer package
+* Auto-start with Windows
+* Better diagnostic report export
+* Community device profile database
+
+See [ROADMAP.md](ROADMAP.md).
+
+---
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
+Latest major updates:
+
+* `0.40.0` — True portable EXE and charging stabilization
+* `0.39.0` — Portable EXE attempt and charging battery fix
+* `0.38.0` — Publish EXE fix
+* `0.37.0` — Build fix for broad device support
+* `0.36.0` — Broad safe wireless device support
+
+---
 
 ## License
 
 MIT License. See [LICENSE](LICENSE).
+
+---
+
+## Disclaimer
+
+Universal Battery Overlay is an unofficial project and is not affiliated with Logitech, Razer, QwertyKey, Microsoft, or any other device manufacturer.
+
+Battery readings depend on hardware, firmware, drivers, and Windows support. Some devices may only support detection, not real battery percentage.
